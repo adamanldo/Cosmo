@@ -1,0 +1,5 @@
+.env
+__pycache__/
+cosmo.log
+venv/
+cogs/misc.py

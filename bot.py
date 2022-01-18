@@ -14,7 +14,8 @@ cogs = (
     'cogs.fmi',
     'cogs.countdown',
     'cogs.db',
-    'cogs.owner'
+    'cogs.owner',
+    'cogs.help'
 )
 
 class Cosmo(commands.Bot):
@@ -23,9 +24,10 @@ class Cosmo(commands.Bot):
         self.api_key = os.getenv("API_KEY")
         self.user_agent = "Cosmo"
 
-        intents = discord.Intents(members=True, messages=True, guilds=True)
+        intents = discord.Intents(members=True, messages=True)
 
         super().__init__(intents=intents, command_prefix='.')
+        super().remove_command('help')
 
         self.session = aiohttp.ClientSession(loop=self.loop)
 
@@ -35,7 +37,7 @@ class Cosmo(commands.Bot):
             except Exception as e:
                 print(f'Failed to load cog {cog}. Exception: {e}')
 
-    async def on_command_error(self, error):
+    async def on_command_error(self, ctx, error):
         ignored = (commands.CommandNotFound, commands.UserInputError)
         if isinstance(error, ignored):
             return

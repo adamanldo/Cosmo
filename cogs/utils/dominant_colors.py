@@ -21,7 +21,7 @@ def dominant_colors(image, clusters=5):
     img = np.frombuffer(image, dtype=np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
 
-    #convert to lab colorspace from bgr
+    #convert to lab color space from bgr
     img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_BGR2LAB)
 
     #reshaping to a list of pixels
@@ -37,7 +37,7 @@ def dominant_colors(image, clusters=5):
     labels = cluster.labels_
 
     #for each label, find the percentage of the cluster centers the label 
-    #consistutes
+    #constitutes
     labels = list(labels)
     percent = []
     for i in range(len(colors)):

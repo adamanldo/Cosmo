@@ -1,4 +1,4 @@
-from .utils import dominant_colors 
+from .utils.dominant_colors import dominant_colors 
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 import re
@@ -66,9 +66,9 @@ class Fmi(commands.Cog):
             await ctx.send(file=discord.File(image, 'fmi.png'))
 
     @fmi.error
-    async def fmi_error(self, ctx, error):
+    async def fmi_error(ctx, error):
         if isinstance(error, commands.CommandInvokeError):
-            await ctx.send("Something went wrong...I'm not feeling too good...")
+            await ctx.send("Something went wrong...I'm not feeling to good...")
             log.error(error)
         if isinstance(error, commands.CommandOnCooldown):
             await ctx.send("You're using that too much.")

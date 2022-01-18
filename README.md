@@ -4,7 +4,7 @@ A Discord bot written with Discord.py that outputs formatted images of your curr
 
 ![Lift Your Skinny Fists Like Antennas to Heaven](/examples/gybe.png)
 ![Merriweather Post Pavilion](/examples/mpp.png)
-![Speaking in Tongues](/examples/speakingintongues.png)
+![Reading, Writing & Arithmetic](/examples/sundays.png)
 
 ## [Add this bot to my server](https://discord.com/api/oauth2/authorize?client_id=516324491618680832&permissions=35840&scope=bot)
 
@@ -29,7 +29,7 @@ I'd rather you use the "Add this bot to my server" link and use my instance, but
 
 1. Make sure you are running Python 3.8 or higher
 2. Clone the repository
-3. Set up venv with `python3.8 -m venv venv`
+3. Set up venv with `python3.8 -m venv venv` and activate it with `source /venv/bin/activate`
 4. Install dependencies with `python3.8 -m pip install -U -r requirements.txt`
 5. Create a `.env` file in the base directory with two variables, `API_KEY` and `DISCORD_TOKEN`, where API_KEY contains your Last.fm API key and DISCORD_TOKEN contains your discord bot's private token
 6. Using PostgreSQL 10 or higher and using the psql tool, create a database `cosmo` under the default user `postgres`, then create a table called `discord` within it:
@@ -38,7 +38,7 @@ I'd rather you use the "Add this bot to my server" link and use my instance, but
 CREATE DATABASE cosmo;
 CREATE TABLE discord ( id bigint PRIMARY KEY UNIQUE, username VARCHAR ( 15 ) NOT NULL );
 ```
-7. Note that the bot is assuming [authentication](https://www.postgresql.org/docs/9.1/auth-methods.html) is set to "trust"
+7. Note that the bot is assuming [authentication](https://www.postgresql.org/docs/10/auth-methods.html) is set to "trust"
 8. Start the PostgreSQL server with `sudo service postgresql start`
 9. Run the bot with `python3.8 launcher.py`
 

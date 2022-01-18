@@ -24,7 +24,7 @@ class Cosmo(commands.Bot):
         self.api_key = os.getenv("API_KEY")
         self.user_agent = "Cosmo"
 
-        intents = discord.Intents(members=True, messages=True)
+        intents = discord.Intents(members=True, messages=True, guilds=True)
 
         super().__init__(intents=intents, command_prefix='.')
         super().remove_command('help')

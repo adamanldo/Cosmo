@@ -29,7 +29,7 @@ I'd rather you use the "Add this bot to my server" link and use my instance, but
 
 1. Make sure you are running Python 3.8 or higher
 2. Clone the repository
-3. Set up venv with `python3.8 -m venv venv` and activate it with `source /venv/bin/activate`
+3. Set up venv with `python3.8 -m venv venv` and activate it with `source venv/bin/activate`
 4. Install dependencies with `python3.8 -m pip install -U -r requirements.txt`
 5. Create a `.env` file in the base directory with two variables, `API_KEY` and `DISCORD_TOKEN`, where API_KEY contains your Last.fm API key and DISCORD_TOKEN contains your discord bot's private token
 6. Using PostgreSQL 10 or higher and using the psql tool, create a database `cosmo` under the default user `postgres`, then create a table called `discord` within it:

@@ -61,14 +61,14 @@ class Fmi(commands.Cog):
             if lastfmusername is None:
                 await ctx.send("It looks like you haven't connected your Last.fm account.\nTry using `.set [username]`")
                 return
-            avatar = str(ctx.author.avatar_url_as(format="jpg",size=128))
+            avatar = str(ctx.author.avatar_url_as(format="png",size=128))
             image = await self.generate_fmi(await self.get_lastfm(ctx, lastfmusername),avatar)
             await ctx.send(file=discord.File(image, 'fmi.png'))
 
     @fmi.error
     async def fmi_error(ctx, error):
         if isinstance(error, commands.CommandInvokeError):
-            await ctx.send("Something went wrong...I'm not feeling to good...")
+            await ctx.send("Something went wrong...")
             log.error(error)
         if isinstance(error, commands.CommandOnCooldown):
             await ctx.send("You're using that too much.")
@@ -76,7 +76,7 @@ class Fmi(commands.Cog):
     async def generate_fmi(self, lastfmdata, avatar_url):
         async with self.bot.session.get(avatar_url) as resp:
             avatar_bytes = await resp.read()
-        avatarimg = Image.open(BytesIO(avatar_bytes))
+        avatarimg = Image.open(BytesIO(avatar_bytes)).convert("RGB")
         album_img = await self.get_album_img(lastfmdata.albumartlink)
         resized_album = self.resize_album_art(album_img)
         primary, secondary = dominant_colors(album_img.getvalue())
@@ -120,7 +120,7 @@ class Fmi(commands.Cog):
     def draw_triangle(self, draw, background, secondary_color, avatar_img):
         draw.polygon([(600,0), (450, 150), (600, 150)], tuple(secondary_color))
         avatar = self.mask_discord_avatar(avatar_img, avatar_img.size)
-        avatar_scaled = avatar.resize((64, 64), resample=Image.ANTIALIAS)
+        avatar_scaled = avatar.resize((64, 64), resample=Image.Resampling.LANCZOS)
         background.paste(avatar_scaled, (525, 75), mask=avatar_scaled)
         return draw, background
 

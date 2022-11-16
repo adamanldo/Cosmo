@@ -14,5 +14,5 @@ class Help(commands.Cog):
         embed.add_field(name='.set', value="Adds last.fm username to database. Format: \".set [last.fm username]\"")
         await ctx.send(embed=embed)
 
-def setup(bot):
-    bot.add_cog(Help(bot))
+async def setup(bot):
+    await bot.add_cog(Help(bot))

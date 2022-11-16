@@ -3,8 +3,22 @@ import logging
 from logging import handlers
 from cogs.db import create_pool
 import asyncio
+import os
+from dotenv import load_dotenv
+import aiohttp
 
-def main():
+#load environmental variables
+load_dotenv()
+
+cogs = (
+    'cogs.fmi',
+    'cogs.countdown',
+    'cogs.db',
+    'cogs.owner',
+    'cogs.help'
+)
+
+async def main():
 
     #set up logging
     max_bytes = 32 * 1024 * 1024
@@ -16,18 +30,24 @@ def main():
     handler.setFormatter(format)
     log.addHandler(handler)
 
-    #set up postgres connection pool
-    loop = asyncio.get_event_loop()
-    try:
-        pool = loop.run_until_complete(create_pool())
-    except Exception as e:
-        print(f"Could not connect to PostgreSQL. Exiting...")
-        print(f"Exception: {e}")
-        return
-
     bot = Cosmo()
-    bot.pool = pool
-    bot.run()
+
+    token = os.getenv("DISCORD_TOKEN")
+
+    async with bot:
+        async with aiohttp.ClientSession() as session:
+            bot.session = session
+            try:
+                bot.pool = await create_pool()
+            except Exception as e:
+                print(f"Exception: {e}")
+
+            for cog in cogs:
+                try:
+                    await bot.load_extension(cog)
+                except Exception as e:
+                    print(f'Failed to load cog {cog}. Exception: {e}')
+            await bot.start(token)
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())

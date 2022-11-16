@@ -23,5 +23,5 @@ class Countdown(commands.Cog):
         if isinstance(error, commands.CommandOnCooldown):
             await ctx.send("This command can only be used once every 10 seconds per server.")
 
-def setup(bot):
-    bot.add_cog(Countdown(bot))
+async def setup(bot):
+    await bot.add_cog(Countdown(bot))

@@ -32,5 +32,5 @@ async def create_pool():
     pool = await asyncpg.create_pool(database='cosmo', user='postgres')
     return pool
 
-def setup(bot):
-    bot.add_cog(DB(bot))
+async def setup(bot):
+    await bot.add_cog(DB(bot))

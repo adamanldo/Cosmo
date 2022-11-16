@@ -52,7 +52,7 @@ class Fmi(commands.Cog):
             if lastfmusername is None:
                 await ctx.send("It looks like {} hasn't connected their Last.fm account.".format(ctx.message.mentions[0].name))
                 return
-            avatar = str(ctx.message.mentions[0].avatar_url_as(format="jpg",size=128))
+            avatar = str(ctx.message.mentions[0].avatar.replace(format="jpg",size=128))
             image = await self.generate_fmi(await self.get_lastfm(ctx, lastfmusername), avatar)
             await ctx.send(file=discord.File(image, 'fmi.png'))
         else:
@@ -61,12 +61,12 @@ class Fmi(commands.Cog):
             if lastfmusername is None:
                 await ctx.send("It looks like you haven't connected your Last.fm account.\nTry using `.set [username]`")
                 return
-            avatar = str(ctx.author.avatar_url_as(format="png",size=128))
+            avatar = str(ctx.author.avatar.replace(format="png",size=128))
             image = await self.generate_fmi(await self.get_lastfm(ctx, lastfmusername),avatar)
             await ctx.send(file=discord.File(image, 'fmi.png'))
 
     @fmi.error
-    async def fmi_error(ctx, error):
+    async def fmi_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError):
             await ctx.send("Something went wrong...")
             log.error(error)
@@ -197,5 +197,5 @@ class Fmi(commands.Cog):
         else:
             return lines[0] + "\n" + lines[1]
 
-def setup(bot):
-    bot.add_cog(Fmi(bot))
+async def setup(bot):
+    await bot.add_cog(Fmi(bot))

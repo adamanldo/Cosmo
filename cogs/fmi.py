@@ -61,7 +61,7 @@ class Fmi(commands.Cog):
             discordID = ctx.message.author.id
             lastfmusername = await db.find_user(discordID)
             if lastfmusername is None:
-                await ctx.send("It looks like you haven't connected your Last.fm account.\nTry using `.set [username]`")
+                await ctx.send("It looks like you haven't connected your Last.fm account.\nTry using `.set username`")
                 return
             avatar = str(ctx.author.avatar.replace(format="png",size=128))
             image = await self.generate_fmi(await self.get_lastfm(ctx, lastfmusername),avatar)

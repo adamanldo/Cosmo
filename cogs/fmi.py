@@ -32,9 +32,11 @@ class Fmi(commands.Cog):
         async with self.bot.session.get(url, headers=headers, params=payload) as resp:
             if resp.status != 200:
                 await ctx.send("Account doesn't exist on Last.fm or we can't connect to the Last.fm API.")
+                return
             js = await resp.json()
             if js is None:
                 await ctx.send("No scrobbles found.")
+                return
 
             lastfmdata = LastFMParameters(artist = js['recenttracks']['track'][0]['artist']['#text'], 
                                           album = js['recenttracks']['track'][0]['album']['#text'],

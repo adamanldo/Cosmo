@@ -1,6 +1,8 @@
 import asyncpg
-import discord
+import logging
 from discord.ext import commands
+
+log = logging.getLogger()
 
 class DB(commands.Cog):
 
@@ -25,7 +27,8 @@ class DB(commands.Cog):
                 async with connection.transaction():
                     await connection.execute(query, ctx.message.author.id, lastfmusername)
                     await ctx.send("{}'s Last.fm account has been set.".format(ctx.message.author.display_name))
-            except:
+            except Exception as e:
+                log.error(e)
                 await ctx.send("There was an error adding the user.")
 
 async def create_pool():

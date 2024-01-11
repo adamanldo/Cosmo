@@ -1,4 +1,4 @@
-from .utils.dominant_colors import dominant_colors 
+from .utils.dominant_colors import dominant_colors
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 import re
@@ -12,60 +12,77 @@ log = logging.getLogger()
 BLACK = 0, 0, 0
 WHITE = 255, 255, 255
 
+
 class Fmi(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    #get currently playing last.fm info
+    # get currently playing last.fm info
     async def get_lastfm(self, ctx, lastfmusername):
         payload = {
-            'method' : 'user.getrecenttracks', 
-            'user': lastfmusername, 
-            'api_key': self.bot.api_key, 
-            'format' : 'json'
+            "method": "user.getrecenttracks",
+            "user": lastfmusername,
+            "api_key": self.bot.api_key,
+            "format": "json",
         }
-        headers = {'user-agent': self.bot.user_agent}
-        url = 'https://ws.audioscrobbler.com/2.0/'
+        headers = {"user-agent": self.bot.user_agent}
+        url = "https://ws.audioscrobbler.com/2.0/"
 
-        LastFMParameters = namedtuple('LastFMParameters', 'artist, album, albumartlink, title')
+        LastFMParameters = namedtuple(
+            "LastFMParameters", "artist, album, albumartlink, title"
+        )
 
         async with self.bot.session.get(url, headers=headers, params=payload) as resp:
             if resp.status != 200:
-                await ctx.send("Account doesn't exist on Last.fm or we can't connect to the Last.fm API.")
+                await ctx.send(
+                    "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."
+                )
                 return
             js = await resp.json()
             if js is None:
                 await ctx.send("No scrobbles found.")
                 return
 
-            lastfmdata = LastFMParameters(artist = js['recenttracks']['track'][0]['artist']['#text'], 
-                                          album = js['recenttracks']['track'][0]['album']['#text'],
-                                          albumartlink = js['recenttracks']['track'][0]['image'][2]['#text'],
-                                          title = js['recenttracks']['track'][0]['name'])
+            lastfmdata = LastFMParameters(
+                artist=js["recenttracks"]["track"][0]["artist"]["#text"],
+                album=js["recenttracks"]["track"][0]["album"]["#text"],
+                albumartlink=js["recenttracks"]["track"][0]["image"][2]["#text"],
+                title=js["recenttracks"]["track"][0]["name"],
+            )
 
             return lastfmdata
 
-    @commands.command(name='fmi')
+    @commands.command(name="fmi")
     @commands.cooldown(3, 10, commands.BucketType.user)
     async def fmi(self, ctx, *args):
-        db = self.bot.get_cog('DB')
+        db = self.bot.get_cog("DB")
         if ctx.message.mentions and len(ctx.message.mentions) == 1:
             lastfmusername = await db.find_user(ctx.message.mentions[0].id)
             if lastfmusername is None:
-                await ctx.send("It looks like {} hasn't connected their Last.fm account.".format(ctx.message.mentions[0].name))
+                await ctx.send(
+                    "It looks like {} hasn't connected their Last.fm account.".format(
+                        ctx.message.mentions[0].name
+                    )
+                )
                 return
-            avatar = str(ctx.message.mentions[0].avatar.replace(format="jpg",size=128))
-            image = await self.generate_fmi(await self.get_lastfm(ctx, lastfmusername), avatar)
-            await ctx.send(file=discord.File(image, 'fmi.png'))
+            avatar = str(ctx.message.mentions[0].avatar.replace(format="jpg", size=128))
+            image = await self.generate_fmi(
+                await self.get_lastfm(ctx, lastfmusername), avatar
+            )
+            await ctx.send(file=discord.File(image, "fmi.png"))
         else:
             discordID = ctx.message.author.id
             lastfmusername = await db.find_user(discordID)
             if lastfmusername is None:
-                await ctx.send("It looks like you haven't connected your Last.fm account.\nTry using `.set username`")
+                await ctx.send(
+                    "It looks like you haven't connected your Last.fm account.\nTry using `.set username`"
+                )
                 return
-            avatar = str(ctx.author.avatar.replace(format="png",size=128))
-            image = await self.generate_fmi(await self.get_lastfm(ctx, lastfmusername),avatar)
-            await ctx.send(file=discord.File(image, 'fmi.png'))
+            avatar = str(ctx.author.avatar.replace(format="png", size=128))
+            image = await self.generate_fmi(
+                await self.get_lastfm(ctx, lastfmusername), avatar
+            )
+            await ctx.send(file=discord.File(image, "fmi.png"))
 
     @fmi.error
     async def fmi_error(self, ctx, error):
@@ -86,20 +103,33 @@ class Fmi(commands.Cog):
         draw, background = self.draw_triangle(draw, background, secondary, avatarimg)
         text_color = self.get_text_color(primary)
         title_font = self.choose_title_font(lastfmdata.title)
-        artist_album_font = self.choose_artist_album_fonts(lastfmdata.artist, lastfmdata.album)
-        self.draw_text(draw, lastfmdata.title, lastfmdata.artist, lastfmdata.album, title_font, artist_album_font, text_color)
+        artist_album_font = self.choose_artist_album_fonts(
+            lastfmdata.artist, lastfmdata.album
+        )
+        self.draw_text(
+            draw,
+            lastfmdata.title,
+            lastfmdata.artist,
+            lastfmdata.album,
+            title_font,
+            artist_album_font,
+            text_color,
+        )
         image = self.generate_image(background)
 
         return image
 
     def gif_to_png(self, gif):
-        gif = Image.open(gif) 
+        gif = Image.open(gif)
         output = BytesIO()
-        gif.save(output, format='PNG')
+        gif.save(output, format="PNG")
         return output
 
     async def get_album_img(self, albumartlink):
         async with self.bot.session.get(albumartlink) as resp:
+            if resp.status != 200:
+                log.error("Error getting album artwork: " + albumartlink)
+                raise
             album = BytesIO(await resp.read())
         if albumartlink.endswith(".gif"):
             album = self.gif_to_png(album)
@@ -114,13 +144,13 @@ class Fmi(commands.Cog):
         return primary, secondary
 
     def make_background(self, album, primary_color):
-        background = Image.new('RGBA', (600,150), tuple(primary_color))
-        background.paste(album, (15,12))
+        background = Image.new("RGBA", (600, 150), tuple(primary_color))
+        background.paste(album, (15, 12))
         draw = ImageDraw.Draw(background)
         return draw, background
-        
+
     def draw_triangle(self, draw, background, secondary_color, avatar_img):
-        draw.polygon([(600,0), (450, 150), (600, 150)], tuple(secondary_color))
+        draw.polygon([(600, 0), (450, 150), (600, 150)], tuple(secondary_color))
         avatar = self.mask_discord_avatar(avatar_img, avatar_img.size)
         avatar_scaled = avatar.resize((64, 64), resample=Image.Resampling.LANCZOS)
         background.paste(avatar_scaled, (525, 75), mask=avatar_scaled)
@@ -143,34 +173,49 @@ class Fmi(commands.Cog):
 
     def choose_artist_album_fonts(self, artist, album):
         if self.cjk_detect(artist) or self.cjk_detect(album):
-            return ImageFont.truetype('fonts/NotoSansCJK-Regular.ttc', 14)
+            return ImageFont.truetype("fonts/NotoSansCJK-Regular.ttc", 14)
         else:
-            return ImageFont.truetype('fonts/NotoSans-Regular.ttf', 14)
+            return ImageFont.truetype("fonts/NotoSans-Regular.ttf", 14)
 
     def choose_title_font(self, title):
         if self.cjk_detect(title):
-            return ImageFont.truetype('fonts/NotoSansCJK-Medium.ttc', 14)
+            return ImageFont.truetype("fonts/NotoSansCJK-Medium.ttc", 14)
         else:
-            return ImageFont.truetype('fonts/NotoSans-SemiBold.ttf', 14)
+            return ImageFont.truetype("fonts/NotoSans-SemiBold.ttf", 14)
 
     def draw_text(self, draw, title, artist, album, titlefont, artistfont, textcolor):
-        draw.text((152, 25), self.wrap_text(title, titlefont, 400, False), textcolor, font=titlefont)
-        draw.text((152,74), self.wrap_text(artist, artistfont, 350, True), textcolor, font=artistfont)
-        draw.text((152,98), self.wrap_text(album, artistfont, 320, False), textcolor, font=artistfont)
+        draw.text(
+            (152, 25),
+            self.wrap_text(title, titlefont, 400, False),
+            textcolor,
+            font=titlefont,
+        )
+        draw.text(
+            (152, 74),
+            self.wrap_text(artist, artistfont, 350, True),
+            textcolor,
+            font=artistfont,
+        )
+        draw.text(
+            (152, 98),
+            self.wrap_text(album, artistfont, 320, False),
+            textcolor,
+            font=artistfont,
+        )
 
     def generate_image(self, background):
         arr = BytesIO()
-        background.save(arr, format='PNG')
+        background.save(arr, format="PNG")
         arr.seek(0)
         return arr
 
     def cjk_detect(self, text):
-        #korean
+        # korean
         if re.search("[\uac00-\ud7a3]", text):
             return True
         # japanese
         if re.search("[\u3040-\u30ff]", text):
-            return True 
+            return True
         # chinese
         if re.search("[\u4e00-\u9FFF]", text):
             return True
@@ -184,9 +229,12 @@ class Fmi(commands.Cog):
             words = text.split()
             count = 0
             while count < len(words):
-                line = ''
-                while count < len(words) and font.getsize(line + words[count])[0] < max_width:
-                    line = line + words[count] + ' '
+                line = ""
+                while (
+                    count < len(words)
+                    and font.getsize(line + words[count])[0] < max_width
+                ):
+                    line = line + words[count] + " "
                     count += 1
                 if not line:
                     line = words[count]
@@ -198,6 +246,7 @@ class Fmi(commands.Cog):
             return lines[0][:-4] + "..."
         else:
             return lines[0] + "\n" + lines[1]
+
 
 async def setup(bot):
     await bot.add_cog(Fmi(bot))

@@ -24,7 +24,7 @@ async def main():
         maxBytes=max_bytes,
         backupCount=5,
     )
-    date_format = "%Y-%m-%d %H:%M:%S"
+    date_format = "%m-%d-%Y %I:%M:%S %p"
     format = logging.Formatter("[{asctime}] {name}: {message}", date_format, style="{")
     handler.setFormatter(format)
     log.addHandler(handler)

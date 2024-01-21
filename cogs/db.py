@@ -4,8 +4,8 @@ from discord.ext import commands
 
 log = logging.getLogger()
 
-class DB(commands.Cog):
 
+class DB(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -14,26 +14,34 @@ class DB(commands.Cog):
         async with self.bot.pool.acquire() as connection:
             row = await connection.fetchrow(query, discordID)
             if row:
-                return row.get('username')
+                return row.get("username")
             return None
-            
-    @commands.command(name='set')
+
+    @commands.command(name="set")
     async def register(self, ctx, lastfmusername: str):
         query = """INSERT INTO discord (id, username)
                     VALUES ($1, $2)
                     ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username"""
-        async with self.bot.pool.acquire() as connection:
-            try:
+        try:
+            async with self.bot.pool.acquire() as connection:
                 async with connection.transaction():
-                    await connection.execute(query, ctx.message.author.id, lastfmusername)
-                    await ctx.send("{}'s Last.fm account has been set.".format(ctx.message.author.display_name))
-            except Exception as e:
-                log.error(e)
-                await ctx.send("There was an error adding the user.")
+                    await connection.execute(
+                        query, ctx.message.author.id, lastfmusername
+                    )
+                    await ctx.send(
+                        "{}'s Last.fm account has been set.".format(
+                            ctx.message.author.display_name
+                        )
+                    )
+        except Exception as e:
+            log.error(e)
+            await ctx.send("There was an error adding the user.")
+
 
 async def create_pool():
-    pool = await asyncpg.create_pool(database='cosmo', user='postgres')
+    pool = await asyncpg.create_pool(database="cosmo", user="postgres")
     return pool
+
 
 async def setup(bot):
     await bot.add_cog(DB(bot))

@@ -13,12 +13,86 @@ BLACK = 0, 0, 0
 WHITE = 255, 255, 255
 
 
+class LastFMInfoError(commands.CommandError):
+    pass
+
+
+class LastFMAlbumArtError(commands.CommandError):
+    pass
+
+
+class NoScrobblesFoundError(commands.CommandError):
+    pass
+
+
+class UserNotFound(commands.CommandError):
+    pass
+
+
+class MentionedUserNotFound(commands.CommandError):
+    def __init__(self, name, *args, **kwargs):
+        self.name = name
+        super().__init__(*args, **kwargs)
+
+
 class Fmi(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    @commands.command(name="fmi")
+    @commands.cooldown(3, 10, commands.BucketType.user)
+    async def fmi(self, ctx, *args):
+        db = self.bot.get_cog("DB")
+        if ctx.message.mentions and len(ctx.message.mentions) == 1:
+            lastfmusername = await db.find_user(ctx.message.mentions[0].id)
+            if lastfmusername is None:
+                raise MentionedUserNotFound(ctx.message.mentions[0].name)
+            avatar = str(ctx.message.mentions[0].avatar.replace(format="png", size=128))
+            image = await self.generate_fmi(
+                await self.get_lastfm(lastfmusername), avatar
+            )
+            await ctx.send(file=discord.File(image, "fmi.png"))
+        else:
+            discordID = ctx.message.author.id
+            lastfmusername = await db.find_user(discordID)
+            if lastfmusername is None:
+                raise UserNotFound
+            avatar = str(ctx.author.avatar.replace(format="png", size=128))
+            image = await self.generate_fmi(
+                await self.get_lastfm(lastfmusername), avatar
+            )
+            await ctx.send(file=discord.File(image, "fmi.png"))
+
+    @fmi.error
+    async def fmi_error(self, ctx, error):
+        if isinstance(error, MentionedUserNotFound):
+            await ctx.send(
+                "It looks like {} hasn't connected their Last.fm account.".format(
+                    error.name
+                )
+            )
+        elif isinstance(error, UserNotFound):
+            await ctx.send(
+                "It looks like you haven't connected your Last.fm account.\nTry using `.set username`"
+            )
+        elif isinstance(error, LastFMInfoError):
+            await ctx.send(
+                "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."
+            )
+        elif isinstance(error, LastFMAlbumArtError):
+            await ctx.send(
+                "We can't get that album artwork from Last.fm right now, try again in a few minutes."
+            )
+        elif isinstance(error, NoScrobblesFoundError):
+            await ctx.send("No scrobbles found.")
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.send("You're using that too much.")
+        else:
+            await ctx.send("Something went wrong...")
+            log.error(error.original)
+
     # get currently playing last.fm info
-    async def get_lastfm(self, ctx, lastfmusername):
+    async def get_lastfm(self, lastfmusername):
         payload = {
             "method": "user.getrecenttracks",
             "user": lastfmusername,
@@ -34,14 +108,10 @@ class Fmi(commands.Cog):
 
         async with self.bot.session.get(url, headers=headers, params=payload) as resp:
             if resp.status != 200:
-                await ctx.send(
-                    "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."
-                )
-                return
+                raise LastFMInfoError
             js = await resp.json()
             if js is None:
-                await ctx.send("No scrobbles found.")
-                return
+                raise NoScrobblesFoundError
 
             lastfmdata = LastFMParameters(
                 artist=js["recenttracks"]["track"][0]["artist"]["#text"],
@@ -51,46 +121,6 @@ class Fmi(commands.Cog):
             )
 
             return lastfmdata
-
-    @commands.command(name="fmi")
-    @commands.cooldown(3, 10, commands.BucketType.user)
-    async def fmi(self, ctx, *args):
-        db = self.bot.get_cog("DB")
-        if ctx.message.mentions and len(ctx.message.mentions) == 1:
-            lastfmusername = await db.find_user(ctx.message.mentions[0].id)
-            if lastfmusername is None:
-                await ctx.send(
-                    "It looks like {} hasn't connected their Last.fm account.".format(
-                        ctx.message.mentions[0].name
-                    )
-                )
-                return
-            avatar = str(ctx.message.mentions[0].avatar.replace(format="jpg", size=128))
-            image = await self.generate_fmi(
-                await self.get_lastfm(ctx, lastfmusername), avatar
-            )
-            await ctx.send(file=discord.File(image, "fmi.png"))
-        else:
-            discordID = ctx.message.author.id
-            lastfmusername = await db.find_user(discordID)
-            if lastfmusername is None:
-                await ctx.send(
-                    "It looks like you haven't connected your Last.fm account.\nTry using `.set username`"
-                )
-                return
-            avatar = str(ctx.author.avatar.replace(format="png", size=128))
-            image = await self.generate_fmi(
-                await self.get_lastfm(ctx, lastfmusername), avatar
-            )
-            await ctx.send(file=discord.File(image, "fmi.png"))
-
-    @fmi.error
-    async def fmi_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError):
-            await ctx.send("Something went wrong...")
-            log.error(error)
-        if isinstance(error, commands.CommandOnCooldown):
-            await ctx.send("You're using that too much.")
 
     async def generate_fmi(self, lastfmdata, avatar_url):
         async with self.bot.session.get(avatar_url) as resp:
@@ -128,8 +158,7 @@ class Fmi(commands.Cog):
     async def get_album_img(self, albumartlink):
         async with self.bot.session.get(albumartlink) as resp:
             if resp.status != 200:
-                log.error("Error getting album artwork: " + albumartlink)
-                raise
+                raise LastFMAlbumArtError
             album = BytesIO(await resp.read())
         if albumartlink.endswith(".gif"):
             album = self.gif_to_png(album)

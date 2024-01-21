@@ -2,12 +2,10 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
-import aiohttp
 import logging
 
 log = logging.getLogger()
 
-# load environmental variables
 load_dotenv()
 
 
@@ -27,9 +25,10 @@ class Cosmo(commands.Bot):
         ignored = (commands.CommandNotFound, commands.UserInputError)
         if isinstance(error, ignored):
             return
-
-        log.error(error)
-        raise error
+        elif ctx.command.has_error_handler():
+            return
+        else:
+            log.error(error)
 
     async def close(self):
         await super().close()

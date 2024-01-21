@@ -1,4 +1,4 @@
-from bot import Cosmo 
+from bot import Cosmo
 import logging
 from logging import handlers
 from cogs.db import create_pool
@@ -7,26 +7,25 @@ import os
 from dotenv import load_dotenv
 import aiohttp
 
-#load environmental variables
 load_dotenv()
 
-cogs = (
-    'cogs.fmi',
-    'cogs.countdown',
-    'cogs.db',
-    'cogs.owner',
-    'cogs.help'
-)
+cogs = ("cogs.fmi", "cogs.countdown", "cogs.db", "cogs.owner", "cogs.help")
+
 
 async def main():
-
-    #set up logging
+    # set up logging
     max_bytes = 32 * 1024 * 1024
     log = logging.getLogger()
     log.setLevel(logging.INFO)
-    handler = logging.handlers.RotatingFileHandler(filename='cosmo.log', encoding='utf-8', mode='w', maxBytes = max_bytes, backupCount=5)
-    date_format = '%Y-%m-%d %H:%M:%S'
-    format = logging.Formatter('[{asctime}] {name}: {message}', date_format, style='{')
+    handler = logging.handlers.RotatingFileHandler(
+        filename="cosmo.log",
+        encoding="utf-8",
+        mode="w",
+        maxBytes=max_bytes,
+        backupCount=5,
+    )
+    date_format = "%Y-%m-%d %H:%M:%S"
+    format = logging.Formatter("[{asctime}] {name}: {message}", date_format, style="{")
     handler.setFormatter(format)
     log.addHandler(handler)
 
@@ -46,8 +45,9 @@ async def main():
                 try:
                     await bot.load_extension(cog)
                 except Exception as e:
-                    print(f'Failed to load cog {cog}. Exception: {e}')
+                    print(f"Failed to load cog {cog}. Exception: {e}")
             await bot.start(token)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())

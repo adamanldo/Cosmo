@@ -36,7 +36,7 @@ I'd rather you use the "Add this bot to my server" link and use my instance, but
 
 ```
 CREATE DATABASE cosmo;
-CREATE TABLE discord ( id bigint PRIMARY KEY UNIQUE, username VARCHAR ( 15 ) NOT NULL );
+CREATE TABLE discord ( id bigint PRIMARY KEY UNIQUE, username TEXT NOT NULL );
 ```
 7. Note that the bot is assuming [authentication](https://www.postgresql.org/docs/10/auth-methods.html) is set to "trust"
 8. Start the PostgreSQL server with `sudo service postgresql start`

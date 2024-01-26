@@ -166,23 +166,23 @@ class Fmi(commands.Cog):
 
     def resize_album_art(self, album):
         album = Image.open(album)
-        return album.resize((125, 125), resample=Image.ANTIALIAS)
+        return album.resize((124, 124), resample=Image.ANTIALIAS)
 
     def color_analysis(self, album, clusters=5):
         primary, secondary = dominant_colors(album, clusters)
         return primary, secondary
 
     def make_background(self, album, primary_color):
-        background = Image.new("RGBA", (600, 150), tuple(primary_color))
-        background.paste(album, (15, 12))
+        background = Image.new("RGBA", (548, 147), tuple(primary_color))
+        background.paste(album, (12, 12))
         draw = ImageDraw.Draw(background)
         return draw, background
 
     def draw_triangle(self, draw, background, secondary_color, avatar_img):
-        draw.polygon([(600, 0), (450, 150), (600, 150)], tuple(secondary_color))
+        draw.polygon([(548, 0), (401, 147), (548, 147)], tuple(secondary_color))
         avatar = self.mask_discord_avatar(avatar_img, avatar_img.size)
         avatar_scaled = avatar.resize((64, 64), resample=Image.Resampling.LANCZOS)
-        background.paste(avatar_scaled, (525, 75), mask=avatar_scaled)
+        background.paste(avatar_scaled, (473, 73), mask=avatar_scaled)
         return draw, background
 
     def mask_discord_avatar(self, image, size):
@@ -214,20 +214,20 @@ class Fmi(commands.Cog):
 
     def draw_text(self, draw, title, artist, album, titlefont, artistfont, textcolor):
         draw.text(
-            (152, 25),
-            self.wrap_text(title, titlefont, 400, False),
+            (146, 23),
+            self.wrap_text(title, titlefont, 350, False),
             textcolor,
             font=titlefont,
         )
         draw.text(
-            (152, 74),
-            self.wrap_text(artist, artistfont, 350, True),
+            (146, 73),
+            self.wrap_text(artist, artistfont, 312, True),
             textcolor,
             font=artistfont,
         )
         draw.text(
-            (152, 98),
-            self.wrap_text(album, artistfont, 320, False),
+            (146, 95),
+            self.wrap_text(album, artistfont, 280, False),
             textcolor,
             font=artistfont,
         )

@@ -214,7 +214,7 @@ class Fmi(commands.Cog):
 
     def draw_text(self, draw, title, artist, album, titlefont, artistfont, textcolor):
         draw.text(
-            (146, 23),
+            (146, 24),
             self.wrap_text(title, titlefont, 350, False),
             textcolor,
             font=titlefont,
@@ -226,7 +226,7 @@ class Fmi(commands.Cog):
             font=artistfont,
         )
         draw.text(
-            (146, 95),
+            (146, 96),
             self.wrap_text(album, artistfont, 280, False),
             textcolor,
             font=artistfont,

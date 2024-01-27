@@ -1,22 +1,22 @@
-# Cosmo
+## Cosmo
 
-A Discord bot written with Discord.py that outputs formatted images of your currently playing Last.fm song along with your avatar.
+A Discord bot written with Discord.py that outputs formatted, color-coordinated images of your currently playing Last.fm song.
 
 ![Pulse / Quartet](/examples/stevereich.png)
 ![Pacific](/examples/haruomi.png)
 ![Get to Heaven](/examples/everythingeverything.png)
 
-## [Add this bot to my server](https://discord.com/api/oauth2/authorize?client_id=516324491618680832&permissions=35840&scope=bot)
+### [Add this bot to my server](https://discord.com/api/oauth2/authorize?client_id=516324491618680832&permissions=35840&scope=bot)
 
-## Usage
+### Usage
 
 Use `.set [username]` to associate your Last.fm username with your Discord account
 
 Use `.fmi` to output your currently playing Last.fm song
 
-Use `.countdown` to start a 10 second countdown (for synchronizing listening parties)
+Use `.cd` to start a 10 second countdown (for synchronizing listening parties)
 
-### Technical Features
+### Technical Notes
 
 - Dominant colors are found through [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) via the [scikit-learn](https://scikit-learn.org/stable/) package
 - Uses the [CIELAB](https://en.wikipedia.org/wiki/CIELAB_color_space) color space for more accurate clustering, as well as the [CIEDE2000 Color-Difference Formula](http://www2.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf) to pick a secondary that is perceptually different enough (if one exists)

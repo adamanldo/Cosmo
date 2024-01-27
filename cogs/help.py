@@ -9,7 +9,7 @@ class Help(commands.Cog):
     @commands.command(name="help")
     async def help(self, ctx):
         embed = discord.Embed()
-        embed.add_field(name=".countdown", value="Countdown for listening parties.")
+        embed.add_field(name=".cd", value="Countdown for listening parties.")
         embed.add_field(
             name=".fmi",
             value="Outputs formatted image of currently playing last.fm song",

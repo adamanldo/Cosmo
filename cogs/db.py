@@ -2,7 +2,7 @@ import asyncpg
 import logging
 from discord.ext import commands
 
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 
 
 class DB(commands.Cog):

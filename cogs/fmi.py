@@ -7,7 +7,7 @@ import discord
 from collections import namedtuple
 import logging
 
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 
 BLACK = 0, 0, 0
 WHITE = 255, 255, 255
@@ -18,7 +18,10 @@ class LastFMInfoError(commands.CommandError):
 
 
 class LastFMAlbumArtError(commands.CommandError):
-    pass
+    def __init__(self, resp, albumartlink, *args, **kwargs):
+        self.resp = resp
+        self.albumartlink = albumartlink
+        super().__init__(*args, **kwargs)
 
 
 class NoScrobblesFoundError(commands.CommandError):
@@ -82,6 +85,11 @@ class Fmi(commands.Cog):
         elif isinstance(error, LastFMAlbumArtError):
             await ctx.send(
                 "We can't get that album artwork from Last.fm right now, try again in a few minutes."
+            )
+            log.error(
+                "Last.fm album art link response error: %s %s",
+                error.resp,
+                error.albumartlink,
             )
         elif isinstance(error, NoScrobblesFoundError):
             await ctx.send("No scrobbles found.")
@@ -158,7 +166,7 @@ class Fmi(commands.Cog):
     async def get_album_img(self, albumartlink):
         async with self.bot.session.get(albumartlink) as resp:
             if resp.status != 200:
-                raise LastFMAlbumArtError
+                raise LastFMAlbumArtError(resp, albumartlink)
             album = BytesIO(await resp.read())
         if albumartlink.endswith(".gif"):
             album = self.gif_to_png(album)

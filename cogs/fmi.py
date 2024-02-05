@@ -49,7 +49,7 @@ class Fmi(commands.Cog):
         if ctx.message.mentions and len(ctx.message.mentions) == 1:
             lastfmusername = await db.find_user(ctx.message.mentions[0].id)
             if lastfmusername is None:
-                raise MentionedUserNotFound(ctx.message.mentions[0].name)
+                raise MentionedUserNotFound(ctx.message.mentions[0].display_name)
             avatar = str(ctx.message.mentions[0].avatar.replace(format="png", size=128))
             image = await self.generate_fmi(
                 await self.get_lastfm(lastfmusername), avatar

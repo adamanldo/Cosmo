@@ -9,7 +9,11 @@ import aiohttp
 
 load_dotenv()
 
-cogs = ("cogs.fmi", "cogs.countdown", "cogs.db", "cogs.owner", "cogs.help")
+# add every cog in the top level cogs folder (ignore subdirectories, these are not cogs)
+cogs = []
+for c in os.listdir("./cogs"):
+    if c.endswith(".py"):
+        cogs.append("cogs." + c[:-3])
 
 
 async def main():

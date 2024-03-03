@@ -87,8 +87,10 @@ class Fmi(commands.Cog):
                 "We can't get that album artwork from Last.fm right now, try again in a few minutes."
             )
             log.error(
-                "Last.fm album art link response error: %s %s",
+                "Last.fm album art link response error: %s %s %s %s",
                 error.resp,
+                error.resp.history,
+                error.resp.url,
                 error.albumartlink,
             )
         elif isinstance(error, NoScrobblesFoundError):

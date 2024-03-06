@@ -28,7 +28,7 @@ class Cosmo(commands.Bot):
         elif ctx.command.has_error_handler():
             return
         else:
-            log.error(error)
+            log.error("Error: ", exc_info=error)
 
     async def close(self):
         await super().close()

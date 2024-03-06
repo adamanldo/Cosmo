@@ -32,6 +32,10 @@ class UserNotFound(commands.CommandError):
     pass
 
 
+class ScrobbleMissingInfoError(commands.CommandError):
+    pass
+
+
 class MentionedUserNotFound(commands.CommandError):
     def __init__(self, name, *args, **kwargs):
         self.name = name
@@ -82,6 +86,10 @@ class Fmi(commands.Cog):
             await ctx.send(
                 "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."
             )
+        elif isinstance(error, ScrobbleMissingInfoError):
+            await ctx.send(
+                "Your most recent scrobble is missing an album name or album artwork."
+            )
         elif isinstance(error, LastFMAlbumArtError):
             await ctx.send(
                 "We can't get that album artwork from Last.fm right now, try again in a few minutes."
@@ -99,12 +107,13 @@ class Fmi(commands.Cog):
             await ctx.send("You're using that too much.")
         else:
             await ctx.send("Something went wrong...")
-            log.error(error.original)
+            log.error("Error: ", exc_info=error)
 
     # get currently playing last.fm info
     async def get_lastfm(self, lastfmusername):
         payload = {
             "method": "user.getrecenttracks",
+            "limit": 1,
             "user": lastfmusername,
             "api_key": self.bot.api_key,
             "format": "json",
@@ -113,7 +122,7 @@ class Fmi(commands.Cog):
         url = "https://ws.audioscrobbler.com/2.0/"
 
         LastFMParameters = namedtuple(
-            "LastFMParameters", "artist, album, albumartlink, title"
+            "LastFMParameters", "title, artist, album, albumartlink"
         )
 
         async with self.bot.session.get(url, headers=headers, params=payload) as resp:
@@ -124,11 +133,14 @@ class Fmi(commands.Cog):
                 raise NoScrobblesFoundError
 
             lastfmdata = LastFMParameters(
+                title=js["recenttracks"]["track"][0]["name"],
                 artist=js["recenttracks"]["track"][0]["artist"]["#text"],
                 album=js["recenttracks"]["track"][0]["album"]["#text"],
                 albumartlink=js["recenttracks"]["track"][0]["image"][2]["#text"],
-                title=js["recenttracks"]["track"][0]["name"],
             )
+
+            if not all(lastfmdata):
+                raise ScrobbleMissingInfoError
 
             return lastfmdata
 
@@ -142,17 +154,11 @@ class Fmi(commands.Cog):
         draw, background = self.make_background(resized_album, primary)
         draw, background = self.draw_triangle(draw, background, secondary, avatarimg)
         text_color = self.get_text_color(primary)
-        title_font = self.choose_title_font(lastfmdata.title)
-        artist_album_font = self.choose_artist_album_fonts(
-            lastfmdata.artist, lastfmdata.album
-        )
         self.draw_text(
             draw,
             lastfmdata.title,
             lastfmdata.artist,
             lastfmdata.album,
-            title_font,
-            artist_album_font,
             text_color,
         )
         image = self.generate_image(background)
@@ -210,8 +216,14 @@ class Fmi(commands.Cog):
             textcolor = WHITE
         return textcolor
 
-    def choose_artist_album_fonts(self, artist, album):
-        if self.cjk_detect(artist) or self.cjk_detect(album):
+    def choose_artist_font(self, artist):
+        if self.cjk_detect(artist):
+            return ImageFont.truetype("fonts/NotoSansCJK-Regular.ttc", 14)
+        else:
+            return ImageFont.truetype("fonts/NotoSans-Regular.ttf", 14)
+
+    def choose_album_font(self, album):
+        if self.cjk_detect(album):
             return ImageFont.truetype("fonts/NotoSansCJK-Regular.ttc", 14)
         else:
             return ImageFont.truetype("fonts/NotoSans-Regular.ttf", 14)
@@ -222,25 +234,31 @@ class Fmi(commands.Cog):
         else:
             return ImageFont.truetype("fonts/NotoSans-SemiBold.ttf", 14)
 
-    def draw_text(self, draw, title, artist, album, titlefont, artistfont, textcolor):
-        draw.text(
-            (146, 24),
-            self.wrap_text(title, titlefont, 350, False),
-            textcolor,
-            font=titlefont,
-        )
-        draw.text(
-            (146, 73),
-            self.wrap_text(artist, artistfont, 312, True),
-            textcolor,
-            font=artistfont,
-        )
-        draw.text(
-            (146, 96),
-            self.wrap_text(album, artistfont, 280, False),
-            textcolor,
-            font=artistfont,
-        )
+    def draw_text(self, draw, title, artist, album, textcolor):
+        if title:
+            titlefont = self.choose_title_font(title)
+            draw.text(
+                (146, 24),
+                self.wrap_text(title, titlefont, 350, False),
+                textcolor,
+                font=titlefont,
+            )
+        if artist:
+            artistfont = self.choose_artist_font(artist)
+            draw.text(
+                (146, 73),
+                self.wrap_text(artist, artistfont, 312, True),
+                textcolor,
+                font=artistfont,
+            )
+        if album:
+            albumfont = self.choose_album_font(album)
+            draw.text(
+                (146, 96),
+                self.wrap_text(album, albumfont, 280, False),
+                textcolor,
+                font=albumfont,
+            )
 
     def generate_image(self, background):
         arr = BytesIO()

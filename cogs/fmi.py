@@ -80,7 +80,7 @@ class Fmi(commands.Cog):
             )
         elif isinstance(error, UserNotFound):
             await ctx.send(
-                "It looks like you haven't connected your Last.fm account.\nTry using `.set username`"
+                "It looks like you haven't connected your Last.fm account.\nTry using `.set [last.fm username]`"
             )
         elif isinstance(error, LastFMInfoError):
             await ctx.send(

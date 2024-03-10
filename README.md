@@ -19,7 +19,7 @@ Use `.cd` to start a 10 second countdown (for synchronizing listening parties)
 ### Technical Notes
 
 - Dominant colors are found through [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) via the [scikit-learn](https://scikit-learn.org/stable/) package
-- Uses the [CIELAB](https://en.wikipedia.org/wiki/CIELAB_color_space) color space for more accurate clustering, as well as the [CIEDE2000 Color-Difference Formula](https://en.wikipedia.org/wiki/Color_difference#CIEDE2000) to pick a secondary that is perceptually different enough.
+- Uses the [CIELAB](https://en.wikipedia.org/wiki/CIELAB_color_space) color space for more accurate clustering, as well as the [CIEDE2000 Color-Difference Formula](https://en.wikipedia.org/wiki/Color_difference#CIEDE2000) to pick a secondary color.
 
 ### Running your own instance
 

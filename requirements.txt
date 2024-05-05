@@ -8,6 +8,7 @@ colour-science==0.3.16
 discord.py==2.1.0
 idna==3.3
 imageio==2.13.5
+imagetext-py==2.2.0
 joblib==1.1.0
 multidict==5.2.0
 networkx==2.6.3

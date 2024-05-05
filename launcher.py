@@ -1,6 +1,7 @@
 from bot import Cosmo
 import logging
-from logging import handlers
+from logging.handlers import RotatingFileHandler
+import argparse
 from cogs.db import create_pool
 import asyncio
 import os
@@ -9,19 +10,13 @@ import aiohttp
 
 load_dotenv()
 
-# add every cog in the top level cogs folder (ignore subdirectories, these are not cogs)
-cogs = []
-for c in os.listdir("./cogs"):
-    if c.endswith(".py"):
-        cogs.append("cogs." + c[:-3])
 
-
-async def main():
+async def main(console_output):
     # set up logging
     max_bytes = 32 * 1024 * 1024
     log = logging.getLogger()
     log.setLevel(logging.INFO)
-    handler = logging.handlers.RotatingFileHandler(
+    file_handler = RotatingFileHandler(
         filename="cosmo.log",
         encoding="utf-8",
         mode="w",
@@ -30,12 +25,25 @@ async def main():
     )
     date_format = "%m-%d-%Y %I:%M:%S %p"
     format = logging.Formatter("[{asctime}] {name}: {message}", date_format, style="{")
-    handler.setFormatter(format)
-    log.addHandler(handler)
+    file_handler.setFormatter(format)
+    file_handler.setLevel(logging.WARNING)
+    log.addHandler(file_handler)
+
+    if console_output:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(format)
+        console_handler.setLevel(logging.WARNING)
+        log.addHandler(console_handler)
 
     bot = Cosmo()
 
     token = os.getenv("DISCORD_TOKEN")
+
+    # add every cog in the top level cogs folder (ignore subdirectories, these are not cogs)
+    cogs = []
+    for c in os.listdir("./cogs"):
+        if c.endswith(".py"):
+            cogs.append("cogs." + c[:-3])
 
     async with bot:
         async with aiohttp.ClientSession() as session:
@@ -54,4 +62,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--console-output", help="Prints logs to the console", default=False
+    )
+    args = parser.parse_args()
+    asyncio.run(main(args.console_output))

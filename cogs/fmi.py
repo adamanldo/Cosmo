@@ -1,16 +1,12 @@
-from .utils.dominant_colors import dominant_colors
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from io import BytesIO
-import re
 from discord.ext import commands
 import discord
 from collections import namedtuple
 import logging
+from .utils.fmi_builder import FmiBuilder
 
 log = logging.getLogger(__name__)
-
-BLACK = 0, 0, 0
-WHITE = 255, 255, 255
 
 
 class LastFMInfoError(commands.CommandError):
@@ -54,9 +50,11 @@ class Fmi(commands.Cog):
             lastfmusername = await db.find_user(ctx.message.mentions[0].id)
             if lastfmusername is None:
                 raise MentionedUserNotFound(ctx.message.mentions[0].display_name)
-            avatar = str(ctx.message.mentions[0].avatar.replace(format="png", size=128))
+            avatar_url = str(
+                ctx.message.mentions[0].avatar.replace(format="png", size=128)
+            )
             image = await self.generate_fmi(
-                await self.get_lastfm(lastfmusername), avatar
+                await self.get_lastfm(lastfmusername), avatar_url
             )
             await ctx.send(file=discord.File(image, "fmi.png"))
         else:
@@ -64,9 +62,9 @@ class Fmi(commands.Cog):
             lastfmusername = await db.find_user(discordID)
             if lastfmusername is None:
                 raise UserNotFound
-            avatar = str(ctx.author.avatar.replace(format="png", size=128))
+            avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
             image = await self.generate_fmi(
-                await self.get_lastfm(lastfmusername), avatar
+                await self.get_lastfm(lastfmusername), avatar_url
             )
             await ctx.send(file=discord.File(image, "fmi.png"))
 
@@ -145,23 +143,19 @@ class Fmi(commands.Cog):
             return lastfmdata
 
     async def generate_fmi(self, lastfmdata, avatar_url):
+        album_art_link = lastfmdata.albumartlink
+
         async with self.bot.session.get(avatar_url) as resp:
-            avatar_bytes = await resp.read()
-        avatarimg = Image.open(BytesIO(avatar_bytes)).convert("RGB")
-        album_img = await self.get_album_img(lastfmdata.albumartlink)
-        resized_album = self.resize_album_art(album_img)
-        primary, secondary = dominant_colors(album_img.getvalue())
-        draw, background = self.make_background(resized_album, primary)
-        draw, background = self.draw_triangle(draw, background, secondary, avatarimg)
-        text_color = self.get_text_color(primary)
-        self.draw_text(
-            draw,
-            lastfmdata.title,
-            lastfmdata.artist,
-            lastfmdata.album,
-            text_color,
-        )
-        image = self.generate_image(background)
+            avatar_bytes = BytesIO(await resp.read())
+
+        async with self.bot.session.get(album_art_link) as resp:
+            if resp.status != 200:
+                raise LastFMAlbumArtError(resp, album_art_link)
+            album_bytes = BytesIO(await resp.read())
+        if album_art_link.endswith(".gif"):
+            album_bytes = self.gif_to_png(album_bytes)
+
+        image = FmiBuilder(album_bytes, avatar_bytes).create_fmi(lastfmdata)
 
         return image
 
@@ -170,139 +164,6 @@ class Fmi(commands.Cog):
         output = BytesIO()
         gif.save(output, format="PNG")
         return output
-
-    async def get_album_img(self, albumartlink):
-        async with self.bot.session.get(albumartlink) as resp:
-            if resp.status != 200:
-                raise LastFMAlbumArtError(resp, albumartlink)
-            album = BytesIO(await resp.read())
-        if albumartlink.endswith(".gif"):
-            album = self.gif_to_png(album)
-        return album
-
-    def resize_album_art(self, album):
-        album = Image.open(album)
-        return album.resize((124, 124), resample=Image.ANTIALIAS)
-
-    def color_analysis(self, album, clusters=5):
-        primary, secondary = dominant_colors(album, clusters)
-        return primary, secondary
-
-    def make_background(self, album, primary_color):
-        background = Image.new("RGBA", (548, 147), tuple(primary_color))
-        background.paste(album, (12, 12))
-        draw = ImageDraw.Draw(background)
-        return draw, background
-
-    def draw_triangle(self, draw, background, secondary_color, avatar_img):
-        draw.polygon([(548, 0), (401, 147), (548, 147)], tuple(secondary_color))
-        avatar = self.mask_discord_avatar(avatar_img, avatar_img.size)
-        avatar_scaled = avatar.resize((64, 64), resample=Image.Resampling.LANCZOS)
-        background.paste(avatar_scaled, (473, 73), mask=avatar_scaled)
-        return draw, background
-
-    def mask_discord_avatar(self, image, size):
-        mask = Image.new("L", size, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.ellipse([0, 0, size[0], size[1]], fill=255)
-        result = image.copy()
-        result.putalpha(mask)
-        return result
-
-    def get_text_color(self, primary_color):
-        if sum(primary_color) > 250:
-            textcolor = BLACK
-        else:
-            textcolor = WHITE
-        return textcolor
-
-    def choose_artist_font(self, artist):
-        if self.cjk_detect(artist):
-            return ImageFont.truetype("fonts/NotoSansCJK-Regular.ttc", 14)
-        else:
-            return ImageFont.truetype("fonts/NotoSans-Regular.ttf", 14)
-
-    def choose_album_font(self, album):
-        if self.cjk_detect(album):
-            return ImageFont.truetype("fonts/NotoSansCJK-Regular.ttc", 14)
-        else:
-            return ImageFont.truetype("fonts/NotoSans-Regular.ttf", 14)
-
-    def choose_title_font(self, title):
-        if self.cjk_detect(title):
-            return ImageFont.truetype("fonts/NotoSansCJK-Medium.ttc", 14)
-        else:
-            return ImageFont.truetype("fonts/NotoSans-SemiBold.ttf", 14)
-
-    def draw_text(self, draw, title, artist, album, textcolor):
-        if title:
-            titlefont = self.choose_title_font(title)
-            draw.text(
-                (146, 24),
-                self.wrap_text(title, titlefont, 350, False),
-                textcolor,
-                font=titlefont,
-            )
-        if artist:
-            artistfont = self.choose_artist_font(artist)
-            draw.text(
-                (146, 73),
-                self.wrap_text(artist, artistfont, 312, True),
-                textcolor,
-                font=artistfont,
-            )
-        if album:
-            albumfont = self.choose_album_font(album)
-            draw.text(
-                (146, 96),
-                self.wrap_text(album, albumfont, 280, False),
-                textcolor,
-                font=albumfont,
-            )
-
-    def generate_image(self, background):
-        arr = BytesIO()
-        background.save(arr, format="PNG")
-        arr.seek(0)
-        return arr
-
-    def cjk_detect(self, text):
-        # korean
-        if re.search("[\uac00-\ud7a3]", text):
-            return True
-        # japanese
-        if re.search("[\u3040-\u30ff]", text):
-            return True
-        # chinese
-        if re.search("[\u4e00-\u9FFF]", text):
-            return True
-        return None
-
-    def wrap_text(self, text, font, max_width, is_artist):
-        if font.getsize(text)[0] < max_width:
-            return text
-        else:
-            lines = []
-            words = text.split()
-            count = 0
-            while count < len(words):
-                line = ""
-                while (
-                    count < len(words)
-                    and font.getsize(line + words[count])[0] < max_width
-                ):
-                    line = line + words[count] + " "
-                    count += 1
-                if not line:
-                    line = words[count]
-                    count += 1
-                lines.append(line)
-        if len(lines) > 2 and not is_artist:
-            return lines[0] + "\n" + lines[1][:-4] + "..."
-        if len(lines) > 1 and is_artist:
-            return lines[0][:-4] + "..."
-        else:
-            return lines[0] + "\n" + lines[1]
 
 
 async def setup(bot):

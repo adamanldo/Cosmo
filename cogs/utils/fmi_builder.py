@@ -111,18 +111,19 @@ class FmiBuilder:
 
         if len(title_wrapped) > 2:
             title_wrapped = title_wrapped[:2]
-            title_wrapped[1] = title_wrapped[1][:-4] + "..."
+            title_wrapped[1] = title_wrapped[1][:-3] + "..."
 
         artist_wrapped = ipy.text_wrap(
             artist,
             312,
             self._font_size,
             self.regular_fonts,
+            wrap_style=ipy.WrapStyle.Character,
         )
 
         if len(artist_wrapped) > 1:
             artist_wrapped = artist_wrapped[0]
-            artist_wrapped = artist_wrapped[:-4] + "..."
+            artist_wrapped = artist_wrapped[:-3] + "..."
         else:
             artist_wrapped = artist_wrapped[0]
 
@@ -135,6 +136,6 @@ class FmiBuilder:
 
         if len(album_wrapped) > 2:
             album_wrapped = album_wrapped[:2]
-            album_wrapped[1] = album_wrapped[1][:-4] + "..."
+            album_wrapped[1] = album_wrapped[1][:-3] + "..."
 
         return title_wrapped, artist_wrapped, album_wrapped

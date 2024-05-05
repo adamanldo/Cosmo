@@ -18,7 +18,7 @@ class Cosmo(commands.Bot):
             members=True, messages=True, guilds=True, message_content=True
         )
 
-        super().__init__(intents=intents, command_prefix="?")
+        super().__init__(intents=intents, command_prefix=".")
         super().remove_command("help")
 
     async def on_command_error(self, ctx, error):

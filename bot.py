@@ -1,12 +1,9 @@
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
 import logging
 import config
 
 log = logging.getLogger(__name__)
-
-load_dotenv()
 
 
 class Cosmo(commands.Bot):

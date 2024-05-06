@@ -4,11 +4,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 import asyncio
 import os
-from dotenv import load_dotenv
 import aiohttp
 import config
-
-load_dotenv()
 
 
 async def main():

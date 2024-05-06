@@ -80,18 +80,16 @@ class Fmi(commands.Cog):
             avatar_url = str(
                 ctx.message.mentions[0].avatar.replace(format="png", size=128)
             )
-            last_fm_info = await self.get_lastfm(lastfm_username)
-            image = await self.generate_fmi(last_fm_info, avatar_url)
-            await ctx.send(file=discord.File(image, "fmi.png"))
         else:
             discord_id = ctx.message.author.id
             lastfm_username = await self.find_user(discord_id)
             if lastfm_username is None:
                 raise UserNotFound
             avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
-            last_fm_info = await self.get_lastfm(lastfm_username)
-            image = await self.generate_fmi(last_fm_info, avatar_url)
-            await ctx.send(file=discord.File(image, "fmi.png"))
+
+        last_fm_info = await self.get_lastfm(lastfm_username)
+        image = await self.generate_fmi(last_fm_info, avatar_url)
+        await ctx.send(file=discord.File(image, "fmi.png"))
 
     @fmi.error
     async def fmi_error(self, ctx, error):

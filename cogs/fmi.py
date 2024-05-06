@@ -42,30 +42,55 @@ class Fmi(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    async def find_user(self, discord_id):
+        query = "SELECT username FROM discord WHERE id = $1;"
+        async with self.bot.db_pool.acquire() as connection:
+            row = await connection.fetchrow(query, discord_id)
+            if row:
+                return row.get("username")
+            return None
+
+    @commands.command(name="set")
+    async def register(self, ctx, lastfm_username: str):
+        query = """INSERT INTO discord (id, username)
+                    VALUES ($1, $2)
+                    ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username"""
+        try:
+            async with self.bot.db_pool.acquire() as connection:
+                async with connection.transaction():
+                    await connection.execute(
+                        query, ctx.message.author.id, lastfm_username
+                    )
+                    await ctx.send(
+                        "{}'s Last.fm account has been set.".format(
+                            ctx.message.author.display_name
+                        )
+                    )
+        except Exception as e:
+            log.error(e)
+            await ctx.send("There was an error adding the user.")
+
     @commands.command(name="fmi")
     @commands.cooldown(3, 10, commands.BucketType.user)
     async def fmi(self, ctx, *args):
-        db = self.bot.get_cog("DB")
         if ctx.message.mentions and len(ctx.message.mentions) == 1:
-            lastfmusername = await db.find_user(ctx.message.mentions[0].id)
-            if lastfmusername is None:
+            lastfm_username = await self.find_user(ctx.message.mentions[0].id)
+            if lastfm_username is None:
                 raise MentionedUserNotFound(ctx.message.mentions[0].display_name)
             avatar_url = str(
                 ctx.message.mentions[0].avatar.replace(format="png", size=128)
             )
-            image = await self.generate_fmi(
-                await self.get_lastfm(lastfmusername), avatar_url
-            )
+            last_fm_info = await self.get_lastfm(lastfm_username)
+            image = await self.generate_fmi(last_fm_info, avatar_url)
             await ctx.send(file=discord.File(image, "fmi.png"))
         else:
-            discordID = ctx.message.author.id
-            lastfmusername = await db.find_user(discordID)
-            if lastfmusername is None:
+            discord_id = ctx.message.author.id
+            lastfm_username = await self.find_user(discord_id)
+            if lastfm_username is None:
                 raise UserNotFound
             avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
-            image = await self.generate_fmi(
-                await self.get_lastfm(lastfmusername), avatar_url
-            )
+            last_fm_info = await self.get_lastfm(lastfm_username)
+            image = await self.generate_fmi(last_fm_info, avatar_url)
             await ctx.send(file=discord.File(image, "fmi.png"))
 
     @fmi.error
@@ -108,11 +133,11 @@ class Fmi(commands.Cog):
             log.error("Error: ", exc_info=error)
 
     # get currently playing last.fm info
-    async def get_lastfm(self, lastfmusername):
+    async def get_lastfm(self, lastfm_username):
         payload = {
             "method": "user.getrecenttracks",
             "limit": 1,
-            "user": lastfmusername,
+            "user": lastfm_username,
             "api_key": self.bot.api_key,
             "format": "json",
         }

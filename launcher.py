@@ -1,57 +1,37 @@
+import asyncpg
 from bot import Cosmo
 import logging
 from logging.handlers import RotatingFileHandler
-import argparse
-from cogs.db import create_pool
 import asyncio
 import os
 from dotenv import load_dotenv
 import aiohttp
+import config
 
 load_dotenv()
 
 
-async def main(console_output):
-    # set up logging
-    max_bytes = 32 * 1024 * 1024
-    log = logging.getLogger()
-    log.setLevel(logging.INFO)
-    file_handler = RotatingFileHandler(
-        filename="cosmo.log",
-        encoding="utf-8",
-        mode="w",
-        maxBytes=max_bytes,
-        backupCount=5,
-    )
-    date_format = "%m-%d-%Y %I:%M:%S %p"
-    format = logging.Formatter("[{asctime}] {name}: {message}", date_format, style="{")
-    file_handler.setFormatter(format)
-    file_handler.setLevel(logging.WARNING)
-    log.addHandler(file_handler)
+async def main():
 
-    if console_output:
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(format)
-        console_handler.setLevel(logging.WARNING)
-        log.addHandler(console_handler)
-
+    setup_logging()
     bot = Cosmo()
-
-    token = os.getenv("DISCORD_TOKEN")
+    token = config.DISCORD_TOKEN
 
     # add every cog in the top level cogs folder (ignore subdirectories, these are not cogs)
     cogs = []
-    for c in os.listdir("./cogs"):
-        if c.endswith(".py"):
-            cogs.append("cogs." + c[:-3])
+    for filename in os.listdir("./cogs"):
+        if filename.endswith(".py"):
+            cogs.append("cogs." + filename[:-3])
 
     async with bot:
         async with aiohttp.ClientSession() as session:
             bot.session = session
             try:
-                bot.pool = await create_pool()
+                bot.db_pool = await asyncpg.create_pool(
+                    database="cosmo", user="postgres"
+                )
             except Exception as e:
-                print(f"Exception: {e}")
+                print(f"Failed to create db pool: {e}")
 
             for cog in cogs:
                 try:
@@ -61,10 +41,33 @@ async def main(console_output):
             await bot.start(token)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--console-output", help="Prints logs to the console", default=False
+def setup_logging():
+
+    # set up logging
+    max_bytes = 32 * 1024 * 1024
+    log = logging.getLogger()
+    log.setLevel(logging.INFO)
+
+    file_handler = RotatingFileHandler(
+        filename="cosmo.log",
+        encoding="utf-8",
+        mode="w",
+        maxBytes=max_bytes,
+        backupCount=5,
     )
-    args = parser.parse_args()
-    asyncio.run(main(args.console_output))
+
+    date_format = "%m-%d-%Y %I:%M:%S %p"
+    format = logging.Formatter("[{asctime}] {name}: {message}", date_format, style="{")
+    file_handler.setFormatter(format)
+    file_handler.setLevel(logging.WARNING)
+    log.addHandler(file_handler)
+
+    if config.BOT_DEBUG:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(format)
+        console_handler.setLevel(logging.WARNING)
+        log.addHandler(console_handler)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

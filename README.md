@@ -29,7 +29,13 @@ If you'd like to run your own instance, you can do it with the instructions belo
 2. Clone the repository
 3. Set up venv with `python3.8 -m venv venv` and activate it with `source venv/bin/activate`
 4. Install dependencies with `python3.8 -m pip install -U -r requirements.txt`
-5. Create a `.env` file in the base directory with two variables, `API_KEY` and `DISCORD_TOKEN`, where API_KEY contains your Last.fm API key and DISCORD_TOKEN contains your discord bot's private token
+5. Create a `.env` file in the base directory with four variables, `LASTFM_API_KEY`, `DISCORD_TOKEN`, `BOT_DEBUG`, and `BOT_PREFIX`: 
+    ```
+    LASTFM_API_KEY: Your Last.fm API key
+    DISCORD_TOKEN: Your Discord bot's private token
+    BOT_DEBUG: (0 or 1) Whether you want errors to print to the console. Set this to 1 if you are running this locally, 0 if you are in a production environment
+    BOT_PREFIX: The prefix for the bot commands. If set to "?", "?fmi" will be the command to output an fmi
+    ```
 6. Using PostgreSQL 10 or higher and using the psql tool, create a database `cosmo` under the default user `postgres`, then create a table called `discord` within it:
 
 ```
@@ -42,4 +48,4 @@ CREATE TABLE discord ( id bigint PRIMARY KEY UNIQUE, username TEXT NOT NULL );
 
 ### Known issues
 
-- There are some issues with font rendering, especially with emojis and certain language fonts that haven't been added yet. I'm working on this now.
+- Font issues should be fixed as of 5/6/2024. We are using imagetext-py, which contains font fallbacks. If there are issues with languages I haven't added yet, please open an issue and I can look into adding them. 

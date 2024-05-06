@@ -13,11 +13,11 @@ class FmiBuilder:
     ipy.FontDB.LoadFromDir("./fonts")
     regular_fonts = ipy.FontDB.Query(
         "NotoSans-Regular NotoSansHK-Regular NotoSansJP-Regular NotoSansKR-Regular NotoSansSC-Regular "
-        + "NotoSansTC-Regular NotoSansArabic-Regular Heebo-Regular Symbola"
+        + "NotoSansTC-Regular NotoSansArabic-Regular Heebo-Regular NotoEmoji-Regular Symbola Unifont"
     )
     bold_fonts = ipy.FontDB.Query(
         "NotoSans-SemiBold NotoSansJP-Medium NotoSansKR-Medium NotoSansSC-Medium "
-        + "NotoSansTC-Medium NotoSansArabic-SemiBold Heebo-SemiBold Symbola"
+        + "NotoSansTC-Medium NotoSansArabic-SemiBold Heebo-SemiBold NotoEmoji-Medium Symbola Unifont"
     )
 
     def __init__(self, album_bytes, avatar_bytes):

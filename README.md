@@ -49,3 +49,4 @@ CREATE TABLE discord ( id bigint PRIMARY KEY UNIQUE, username TEXT NOT NULL );
 ### Known issues
 
 - Font issues should be fixed as of 5/6/2024. We are using imagetext-py, which contains font fallbacks. If there are issues with languages I haven't added yet, please open an issue and I can look into adding them. 
+- Arabic fonts do not render properly (the glyphs are shown from left-to-right instead of right-to-left).

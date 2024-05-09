@@ -72,24 +72,22 @@ class Fmi(commands.Cog):
 
     @commands.command(name="fmi")
     @commands.cooldown(3, 10, commands.BucketType.user)
-    async def fmi(self, ctx, *args):
-        if ctx.message.mentions and len(ctx.message.mentions) == 1:
-            lastfm_username = await self.find_user(ctx.message.mentions[0].id)
-            if lastfm_username is None:
-                raise MentionedUserNotFound(ctx.message.mentions[0].display_name)
-            avatar_url = str(
-                ctx.message.mentions[0].avatar.replace(format="png", size=128)
-            )
-        else:
-            discord_id = ctx.message.author.id
-            lastfm_username = await self.find_user(discord_id)
-            if lastfm_username is None:
-                raise UserNotFound
-            avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
+    async def fmi(self, ctx, other_user: discord.Member = None):
+        async with ctx.channel.typing():
+            if other_user:
+                lastfm_username = await self.find_user(other_user.id)
+                if lastfm_username is None:
+                    raise MentionedUserNotFound(other_user.display_name)
+                avatar_url = str(other_user.avatar.replace(format="png", size=128))
+            else:
+                lastfm_username = await self.find_user(ctx.message.author.id)
+                if lastfm_username is None:
+                    raise UserNotFound
+                avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
 
-        last_fm_info = await self.get_lastfm(lastfm_username)
-        image = await self.generate_fmi(last_fm_info, avatar_url)
-        await ctx.send(file=discord.File(image, "fmi.png"))
+            last_fm_info = await self.get_lastfm(lastfm_username)
+            image = await self.generate_fmi(last_fm_info, avatar_url)
+            await ctx.send(file=discord.File(image, "fmi.png"))
 
     @fmi.error
     async def fmi_error(self, ctx, error):
@@ -103,6 +101,8 @@ class Fmi(commands.Cog):
             await ctx.send(
                 "It looks like you haven't connected your Last.fm account.\nTry using `.set [last.fm username]`"
             )
+        elif isinstance(error, commands.BadArgument):
+            await ctx.send("Couldn't find that user in the server.")
         elif isinstance(error, LastFMInfoError):
             await ctx.send(
                 "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."

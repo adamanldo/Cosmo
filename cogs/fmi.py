@@ -1,12 +1,22 @@
+import typing
 from PIL import Image
 from io import BytesIO
 from discord.ext import commands
 import discord
-from collections import namedtuple
+from typing import NamedTuple
 import logging
 from .utils.fmi_builder import FmiBuilder
 
 log = logging.getLogger(__name__)
+
+
+class LastFmParameters(NamedTuple):
+    """Represents data returned from Last.fm"""
+
+    title: str
+    artist: str
+    album: str
+    albumartlink: str
 
 
 class LastFMInfoError(commands.CommandError):
@@ -72,7 +82,7 @@ class Fmi(commands.Cog):
 
     @commands.command(name="fmi")
     @commands.cooldown(3, 10, commands.BucketType.user)
-    async def fmi(self, ctx, other_user: discord.Member = None):
+    async def fmi(self, ctx, other_user: typing.Optional[discord.Member] = None):
         async with ctx.channel.typing():
             if other_user:
                 lastfm_username = await self.find_user(other_user.id)
@@ -101,8 +111,6 @@ class Fmi(commands.Cog):
             await ctx.send(
                 "It looks like you haven't connected your Last.fm account.\nTry using `.set [last.fm username]`"
             )
-        elif isinstance(error, commands.BadArgument):
-            await ctx.send("Couldn't find that user in the server.")
         elif isinstance(error, LastFMInfoError):
             await ctx.send(
                 "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."
@@ -131,7 +139,7 @@ class Fmi(commands.Cog):
             log.error("Error: ", exc_info=error)
 
     # get currently playing last.fm info
-    async def get_lastfm(self, lastfm_username):
+    async def get_lastfm(self, lastfm_username: str) -> LastFmParameters:
         payload = {
             "method": "user.getrecenttracks",
             "limit": 1,
@@ -142,10 +150,6 @@ class Fmi(commands.Cog):
         headers = {"user-agent": self.bot.user_agent}
         url = "https://ws.audioscrobbler.com/2.0/"
 
-        LastFMParameters = namedtuple(
-            "LastFMParameters", "title, artist, album, albumartlink"
-        )
-
         async with self.bot.session.get(url, headers=headers, params=payload) as resp:
             if resp.status != 200:
                 raise LastFMInfoError
@@ -153,7 +157,7 @@ class Fmi(commands.Cog):
             if js is None:
                 raise NoScrobblesFoundError
 
-            lastfmdata = LastFMParameters(
+            lastfmdata = LastFmParameters(
                 title=js["recenttracks"]["track"][0]["name"],
                 artist=js["recenttracks"]["track"][0]["artist"]["#text"],
                 album=js["recenttracks"]["track"][0]["album"]["#text"],

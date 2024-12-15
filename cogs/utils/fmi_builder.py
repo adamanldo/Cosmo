@@ -1,6 +1,7 @@
 from io import BytesIO
 import imagetext_py as ipy
 from PIL import Image, ImageDraw
+
 from .dominant_colors import dominant_colors
 
 
@@ -9,73 +10,57 @@ WHITE = ipy.Paint.Color((255, 255, 255, 255))
 
 
 class FmiBuilder:
-
-    ipy.FontDB.LoadFromDir("./fonts")
-    regular_fonts = ipy.FontDB.Query(
-        "NotoSans-Regular NotoSansHK-Regular NotoSansJP-Regular NotoSansKR-Regular NotoSansSC-Regular "
-        + "NotoSansTC-Regular NotoSansArabic-Regular Heebo-Regular NotoEmoji-Regular Symbola Unifont"
-    )
-    bold_fonts = ipy.FontDB.Query(
-        "NotoSans-SemiBold NotoSansJP-Medium NotoSansKR-Medium NotoSansSC-Medium "
-        + "NotoSansTC-Medium NotoSansArabic-SemiBold Heebo-SemiBold NotoEmoji-Medium Symbola Unifont"
-    )
-
-    def __init__(self, album_bytes, avatar_bytes):
+    def __init__(self, album_bytes, avatar_bytes, text):
         self._primary, self._secondary = dominant_colors(album_bytes.getvalue())
-        self._avatar = self.mask_and_resize_discord_avatar(avatar_bytes)
-        self._album = Image.open(album_bytes).resize(
+        self._avatar_image = self.mask_and_resize_discord_avatar(avatar_bytes)
+        self._album_image = Image.open(album_bytes).resize(
             (124, 124), resample=Image.ANTIALIAS
         )
-        self._font_size = 19
+        self._text = text
+        self._text_color = self.get_text_color(self._primary)
         self._background = Image.new("RGBA", (548, 147), tuple(self._primary))
         self._background_draw = ImageDraw.Draw(self._background)
 
-    def create_fmi(self, lastfmdata):
+    def create_fmi(self):
         # Paste the album image
-        self._background.paste(self._album, (12, 12))
+        self._background.paste(self._album_image, (12, 12))
 
         # Draw the triangle, paste the user's avatar
         self._background_draw.polygon(
             [(548, 0), (401, 147), (548, 147)], tuple(self._secondary)
         )
-        self._background.paste(self._avatar, (473, 73), mask=self._avatar)
-
-        text_color = self.get_text_color(self._primary)
-
-        title_wrapped, artist_wrapped, album_wrapped = self.get_wrapped_text(
-            lastfmdata.title, lastfmdata.artist, lastfmdata.album
-        )
+        self._background.paste(self._avatar_image, (473, 73), mask=self._avatar_image)
 
         with ipy.Writer(self._background) as w:
             w.draw_text_multiline(
-                text=title_wrapped,
+                text=self._text.title_text,
                 x=146,
                 y=24,
                 ax=0,
                 ay=0,
                 width=350,
-                size=self._font_size,
-                font=self.bold_fonts,
-                fill=text_color,
+                size=self._text.font_size,
+                font=self._text.bold_fonts,
+                fill=self._text_color,
             )
             w.draw_text(
-                text=artist_wrapped,
+                text=self._text.artist_text,
                 x=146,
                 y=73,
-                size=self._font_size,
-                font=self.regular_fonts,
-                fill=text_color,
+                size=self._text.font_size,
+                font=self._text.regular_fonts,
+                fill=self._text_color,
             )
             w.draw_text_multiline(
-                text=album_wrapped,
+                text=self._text.album_text,
                 x=146,
                 y=96,
                 ax=0,
                 ay=0,
                 width=280,
-                size=self._font_size,
-                font=self.regular_fonts,
-                fill=text_color,
+                size=self._text.font_size,
+                font=self._text.regular_fonts,
+                fill=self._text_color,
             )
 
         arr = BytesIO()
@@ -96,46 +81,7 @@ class FmiBuilder:
 
     def get_text_color(self, primary_color):
         if sum(primary_color) > 250:
-            textcolor = BLACK
+            text_color = BLACK
         else:
-            textcolor = WHITE
-        return textcolor
-
-    def get_wrapped_text(self, title, artist, album):
-        title_wrapped = ipy.text_wrap(
-            title,
-            350,
-            self._font_size,
-            self.bold_fonts,
-        )
-
-        if len(title_wrapped) > 2:
-            title_wrapped = title_wrapped[:2]
-            title_wrapped[1] = title_wrapped[1][:-3] + "..."
-
-        artist_wrapped = ipy.text_wrap(
-            artist,
-            312,
-            self._font_size,
-            self.regular_fonts,
-            wrap_style=ipy.WrapStyle.Character,
-        )
-
-        if len(artist_wrapped) > 1:
-            artist_wrapped = artist_wrapped[0]
-            artist_wrapped = artist_wrapped[:-3] + "..."
-        else:
-            artist_wrapped = artist_wrapped[0]
-
-        album_wrapped = ipy.text_wrap(
-            album,
-            280,
-            self._font_size,
-            self.regular_fonts,
-        )
-
-        if len(album_wrapped) > 2:
-            album_wrapped = album_wrapped[:2]
-            album_wrapped[1] = album_wrapped[1][:-3] + "..."
-
-        return title_wrapped, artist_wrapped, album_wrapped
+            text_color = WHITE
+        return text_color

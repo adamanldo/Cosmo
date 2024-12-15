@@ -5,6 +5,8 @@ from discord.ext import commands
 import discord
 from typing import NamedTuple
 import logging
+
+from .utils.fmi_text import FmiText
 from .utils.fmi_builder import FmiBuilder
 
 log = logging.getLogger(__name__)
@@ -182,7 +184,8 @@ class Fmi(commands.Cog):
         if album_art_link.endswith(".gif"):
             album_bytes = self.gif_to_png(album_bytes)
 
-        image = FmiBuilder(album_bytes, avatar_bytes).create_fmi(lastfmdata)
+        text = FmiText(lastfmdata)
+        image = FmiBuilder(album_bytes, avatar_bytes, text).create_fmi()
 
         return image
 

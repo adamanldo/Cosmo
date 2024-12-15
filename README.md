@@ -48,5 +48,6 @@ CREATE TABLE discord ( id bigint PRIMARY KEY UNIQUE, username TEXT NOT NULL );
 
 ### Known issues
 
+- There are problems with some strange Unicode characters used in a few song names. They are displayed correctly on the image but the function to wrap the text doesn't seem to correctly size them, leading to the text overflowing onto the avatar.
 - Font issues should be fixed as of 5/6/2024. We are using imagetext-py, which contains font fallbacks. If there are issues with languages I haven't added yet, please open an issue and I can look into adding them. 
-- Arabic fonts do not render properly (the glyphs are shown from left-to-right instead of right-to-left).
+- Arabic and Hebrew should be rendered properly as of 12/15/2024 thanks to some useful Python libraries.

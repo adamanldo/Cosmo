@@ -7,7 +7,6 @@ import config
 
 
 async def main():
-
     setup_logging()
     token = config.DISCORD_TOKEN
 
@@ -23,7 +22,6 @@ async def main():
 
 
 def setup_logging():
-
     # set up logging
     max_bytes = 32 * 1024 * 1024
     log = logging.getLogger()

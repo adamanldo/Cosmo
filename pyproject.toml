@@ -1,0 +1,45 @@
+[project]
+name = "Cosmo"
+version = "0.1.0"
+description = "A Discord bot that outputs formatted, color-coordinated images of your currently playing Last.fm song."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp==3.7.4.post0",
+    "arabic-reshaper==3.0.0",
+    "async-timeout==3.0.1",
+    "asyncpg==0.25.0",
+    "attrs==21.3.0",
+    "chardet==4.0.0",
+    "colormath==3.0.0",
+    "colour-science==0.3.16",
+    "discord-py==2.1.0",
+    "idna==3.3",
+    "imageio==2.13.5",
+    "imagetext-py==2.2.0",
+    "joblib==1.1.0",
+    "multidict==5.2.0",
+    "networkx==2.6.3",
+    "numpy==1.21.5",
+    "opencv-python==4.5.4.60",
+    "packaging==21.3",
+    "pillow==9.1.0",
+    "pyparsing==3.0.6",
+    "python-bidi==0.6.3",
+    "python-dotenv==0.19.2",
+    "pytz==2022.1",
+    "pywavelets==1.2.0",
+    "scikit-image==0.19.1",
+    "scikit-learn==1.0.2",
+    "scipy==1.7.3",
+    "six==1.16.0",
+    "threadpoolctl==3.0.0",
+    "tifffile==2021.11.2",
+    "typing-extensions==4.0.1",
+    "yarl==1.7.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.3",
+]

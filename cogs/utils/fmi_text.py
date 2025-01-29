@@ -5,7 +5,6 @@ from bidi.algorithm import get_display
 
 
 class FmiText:
-
     ipy.FontDB.LoadFromDir("./fonts")
     regular_fonts = ipy.FontDB.Query(
         "NotoSans-Regular NotoSansHK-Regular NotoSansJP-Regular NotoSansKR-Regular NotoSansSC-Regular "
@@ -23,11 +22,11 @@ class FmiText:
         self.album_text = self.process_text(lastfmdata.album, text_type="album")
 
     def contains_arabic(self, text):
-        return bool(re.search("[\u0600-\u06FF]", text))
+        return bool(re.search("[\u0600-\u06ff]", text))
 
     def is_rtl_language(self, text):
         return bool(
-            re.search("[\u0600-\u06FF]", text) or re.search("[\u0590-\u05fe]", text)
+            re.search("[\u0600-\u06ff]", text) or re.search("[\u0590-\u05fe]", text)
         )
 
     def reshape_arabic_text(self, text):

@@ -18,7 +18,6 @@ def lab_to_rgb(color):
 
 
 def dominant_colors(image, clusters=5):
-
     img = np.frombuffer(image, dtype=np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
 

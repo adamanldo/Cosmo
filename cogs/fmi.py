@@ -1,4 +1,5 @@
 import typing
+import asyncio
 from PIL import Image
 from io import BytesIO
 from discord.ext import commands
@@ -171,17 +172,34 @@ class Fmi(commands.Cog):
 
             return lastfmdata
 
+    async def _fetch_image(self, url):
+        async with self.bot.session.get(url) as resp:
+            if resp.status == 200:
+                return BytesIO(await resp.read()), None
+
+        # retry with no-cache
+        async with self.bot.session.get(url, headers={"Cache-Control": "no-cache"}) as resp:
+            if resp.status == 200:
+                return BytesIO(await resp.read()), None
+            # we shouldn't get here
+            return None, resp
+
     async def generate_fmi(self, lastfmdata, avatar_url):
-        album_art_link = lastfmdata.albumartlink
+        album_resp, avatar_resp = await asyncio.gather(
+            self._fetch_image(lastfmdata.albumartlink),
+            self._fetch_image(avatar_url)
+        )
 
-        async with self.bot.session.get(avatar_url) as resp:
-            avatar_bytes = BytesIO(await resp.read())
+        album_bytes, final_resp = album_resp
+        if album_bytes is None:
+            raise LastFMAlbumArtError(
+                resp=final_resp,
+                albumartlink=lastfmdata.albumartlink
+            )
 
-        async with self.bot.session.get(album_art_link) as resp:
-            if resp.status != 200:
-                raise LastFMAlbumArtError(resp, album_art_link)
-            album_bytes = BytesIO(await resp.read())
-        if album_art_link.endswith(".gif"):
+        avatar_bytes, _ = avatar_resp
+
+        if lastfmdata.albumartlink.endswith(".gif"):
             album_bytes = self.gif_to_png(album_bytes)
 
         text = FmiText(lastfmdata)

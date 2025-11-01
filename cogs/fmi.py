@@ -12,6 +12,12 @@ from .utils.fmi_builder import FmiBuilder
 
 log = logging.getLogger(__name__)
 
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+}
+
 
 class LastFmParameters(NamedTuple):
     """Represents data returned from Last.fm"""
@@ -174,27 +180,46 @@ class Fmi(commands.Cog):
 
     async def _fetch_image(self, url):
         async with self.bot.session.get(url) as resp:
-            if resp.status == 200:
-                return BytesIO(await resp.read()), None
+            content = await resp.read()
+            x_cache = resp.headers.get("X-Cache", "")
+            status = resp.status
 
-        # retry with no-cache
-        async with self.bot.session.get(url, headers={"Cache-Control": "no-cache"}) as resp:
-            if resp.status == 200:
-                return BytesIO(await resp.read()), None
-            # we shouldn't get here
+            if status == 200 and content:
+                return BytesIO(content), None
+
+            if status == 404 and x_cache.startswith("HIT"):
+                log.error(
+                    "Received 404 with cache HIT for URL: %s, retrying with browser headers.",
+                    url,
+                )
+                async with self.bot.session.get(
+                    url, headers=BROWSER_HEADERS
+                ) as retry_resp:
+                    retry_content = await retry_resp.read()
+                    if retry_resp.status == 200 and retry_content:
+                        return BytesIO(retry_content), None
+
+            elif status == 404 and x_cache.startswith("MISS"):
+                log.error(
+                    "Received 404 with cache MISS for URL: %s, retrying normally.", url
+                )
+                async with self.bot.session.get(url) as retry_resp:
+                    retry_content = await retry_resp.read()
+                    if retry_resp.status == 200 and retry_content:
+                        return BytesIO(retry_content), None
+
+            # if all else fails
             return None, resp
 
     async def generate_fmi(self, lastfmdata, avatar_url):
         album_resp, avatar_resp = await asyncio.gather(
-            self._fetch_image(lastfmdata.albumartlink),
-            self._fetch_image(avatar_url)
+            self._fetch_image(lastfmdata.albumartlink), self._fetch_image(avatar_url)
         )
 
         album_bytes, final_resp = album_resp
         if album_bytes is None:
             raise LastFMAlbumArtError(
-                resp=final_resp,
-                albumartlink=lastfmdata.albumartlink
+                resp=final_resp, albumartlink=lastfmdata.albumartlink
             )
 
         avatar_bytes, _ = avatar_resp

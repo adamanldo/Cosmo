@@ -90,23 +90,22 @@ class Fmi(commands.Cog):
             await ctx.send("There was an error adding the user.")
 
     @commands.command(name="fmi")
-    @commands.cooldown(3, 10, commands.BucketType.user)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def fmi(self, ctx, other_user: typing.Optional[discord.Member] = None):
-        async with ctx.channel.typing():
-            if other_user:
-                lastfm_username = await self.find_user(other_user.id)
-                if lastfm_username is None:
-                    raise MentionedUserNotFound(other_user.display_name)
-                avatar_url = str(other_user.avatar.replace(format="png", size=128))
-            else:
-                lastfm_username = await self.find_user(ctx.message.author.id)
-                if lastfm_username is None:
-                    raise UserNotFound
-                avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
+        if other_user:
+            lastfm_username = await self.find_user(other_user.id)
+            if lastfm_username is None:
+                raise MentionedUserNotFound(other_user.display_name)
+            avatar_url = str(other_user.avatar.replace(format="png", size=128))
+        else:
+            lastfm_username = await self.find_user(ctx.message.author.id)
+            if lastfm_username is None:
+                raise UserNotFound
+            avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
 
-            last_fm_info = await self.get_lastfm(lastfm_username)
-            image = await self.generate_fmi(last_fm_info, avatar_url)
-            await ctx.send(file=discord.File(image, "fmi.png"))
+        last_fm_info = await self.get_lastfm(lastfm_username)
+        image = await self.generate_fmi(last_fm_info, avatar_url)
+        await ctx.send(file=discord.File(image, "fmi.png"))
 
     @fmi.error
     async def fmi_error(self, ctx, error):

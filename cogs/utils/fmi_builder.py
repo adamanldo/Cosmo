@@ -68,7 +68,6 @@ class FmiBuilder:
         arr.seek(0)
         return arr
 
-    # Masks and resizes discord avatar so it's ready to draw onto the background
     def mask_and_resize_discord_avatar(self, avatar_bytes):
         avatar = Image.open(avatar_bytes).convert("RGB")
         mask = Image.new("L", avatar.size, 0)

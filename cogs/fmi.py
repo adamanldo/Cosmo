@@ -269,6 +269,7 @@ class Fmi(commands.Cog):
                     content = await resp.read()
                     return BytesIO(content)
                 elif resp.status == 404:
+                    log.warning("No CAA art found for MBID %s", mbid)
                     return None
                 else:
                     log.warning(
@@ -287,6 +288,7 @@ class Fmi(commands.Cog):
                     content = await resp.read()
                     return BytesIO(content)
                 elif resp.status == 404:
+                    log.warning("No Last.fm art found at url: %s", lastfm_url)
                     return None
                 else:
                     log.warning(
@@ -326,6 +328,9 @@ class Fmi(commands.Cog):
 
         album_bytes = album_result
         if album_bytes is None:
+            log.error(
+                "Album art not found for %s / %s", lastfmdata.artist, lastfmdata.album
+            )
             raise AlbumArtError()
 
         avatar_bytes = avatar_result

@@ -6,6 +6,7 @@ from io import BytesIO
 from typing import NamedTuple
 
 import discord
+import musicbrainzngs
 from discord.ext import commands
 from diskcache import Cache
 from PIL import Image
@@ -69,6 +70,10 @@ class MentionedUserNotFound(commands.CommandError):
 class Fmi(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        musicbrainzngs.set_useragent(
+            "Cosmo",
+            "1.0",
+        )
 
     async def find_user(self, discord_id):
         query = "SELECT username FROM discord WHERE id = $1;"
@@ -218,46 +223,69 @@ class Fmi(commands.Cog):
         key = hashlib.md5(f"{artist}:{album}".encode()).hexdigest()
         cached_image = album_cache.get(key)
         if cached_image:
+            log.info("Album art cache hit for %s / %s", artist, album)
             return BytesIO(cached_image)
 
         mbid = await self._get_mbid(artist, album)
         if mbid:
+            log.info("Fetching album art from CAA for MBID %s", mbid)
             img = await self._fetch_caa_art(mbid)
             if img:
-                album_cache.set(key, img.getvalue())
-                return img
+                try:
+                    img.seek(0)
+                    with Image.open(img) as im:
+                        im.verify()
+                    img.seek(0)
+                    album_cache.set(key, img.getvalue())
+                    return img
+                except Exception:
+                    log.warning("Invalid album art fetched for %s / %s", artist, album)
 
         if lastfm_url:
+            log.info("Fetching album art from Last.fm for %s / %s", artist, album)
             img = await self._fetch_lastfm_art(lastfm_url)
             if img:
-                album_cache.set(key, img.getvalue())
-                return img
+                try:
+                    img.seek(0)
+                    with Image.open(img) as im:
+                        im.verify()
+                    img.seek(0)
+                    album_cache.set(key, img.getvalue())
+                    return img
+                except Exception:
+                    log.warning(
+                        "Invalid album art fetched from Last.fm for %s / %s",
+                        artist,
+                        album,
+                    )
 
+        log.warning("Album art not found for %s / %s", artist, album)
         return None
 
     async def _get_mbid(self, artist, album):
         key = f"{artist}:{album}"
         cached_mbid = mbid_cache.get(key)
         if cached_mbid:
+            log.info("MBID cache hit for %s: %s", key, cached_mbid)
             return cached_mbid
 
-        query = f'artist:"{artist}" AND release:"{album}"'
-        params = {"query": query, "fmt": "json", "limit": 1}
-        headers = {"User-Agent": self.bot.user_agent}
-
         try:
-            async with self.bot.session.get(
-                MUSICBRAINZ_SEARCH_URL, params=params, headers=headers
-            ) as resp:
-                if resp.status == 200:
-                    js = await resp.json()
-                    releases = js.get("releases")
-                    if releases:
-                        mbid = releases[0]["id"]
-                        mbid_cache.set(key, mbid)
-                        return mbid
-        except Exception as e:
-            log.warning("MusicBrainz request failed for %s/%s: %s", artist, album, e)
+            result = musicbrainzngs.search_releases(
+                artist=artist, release=album, limit=1
+            )
+            log.debug("MusicBrainz search result for %s: %s", key, result)
+
+            if "release-list" in result and result["release-list"]:
+                mbid = result["release-list"][0]["id"]
+                log.info("Caching MBID for %s: %s", key, mbid)
+                mbid_cache.set(key, mbid)
+                return mbid
+            else:
+                log.warning(
+                    "No releases found for artist: %s, album: %s", artist, album
+                )
+        except musicbrainzngs.WebServiceError as e:
+            log.exception("MusicBrainz query failed for %s/%s: %s", artist, album, e)
 
         return None
 
@@ -270,15 +298,15 @@ class Fmi(commands.Cog):
                     return BytesIO(content)
                 elif resp.status == 404:
                     log.warning("No CAA art found for MBID %s", mbid)
-                    return None
                 else:
                     log.warning(
                         "CAA returned unexpected status %d for MBID %s",
                         resp.status,
                         mbid,
                     )
-        except Exception:
-            log.exception("CAA request failed for MBID %s", mbid)
+        except Exception as e:
+            log.exception("Failed to fetch CAA art for MBID %s: %s", mbid, e)
+
         return None
 
     async def _fetch_lastfm_art(self, lastfm_url):

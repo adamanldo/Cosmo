@@ -1,9 +1,10 @@
-from bot import Cosmo
-import logging
-from logging.handlers import RotatingFileHandler
 import asyncio
+import logging
 import os
+from logging.handlers import RotatingFileHandler
+
 import config
+from bot import Cosmo
 
 
 async def main():
@@ -44,7 +45,7 @@ def setup_logging():
     if config.BOT_DEBUG:
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(format)
-        console_handler.setLevel(logging.WARNING)
+        console_handler.setLevel(logging.DEBUG)
         log.addHandler(console_handler)
 
 

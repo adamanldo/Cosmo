@@ -20,6 +20,7 @@ dependencies = [
     "imagetext-py==2.2.0",
     "joblib==1.1.0",
     "multidict==5.2.0",
+    "musicbrainzngs>=0.7.1",
     "networkx==2.6.3",
     "numpy==1.21.5",
     "opencv-python==4.5.4.60",

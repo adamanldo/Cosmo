@@ -109,6 +109,7 @@ dependencies = [
     { name = "imagetext-py" },
     { name = "joblib" },
     { name = "multidict" },
+    { name = "musicbrainzngs" },
     { name = "networkx" },
     { name = "numpy" },
     { name = "opencv-python" },
@@ -151,6 +152,7 @@ requires-dist = [
     { name = "imagetext-py", specifier = "==2.2.0" },
     { name = "joblib", specifier = "==1.1.0" },
     { name = "multidict", specifier = "==5.2.0" },
+    { name = "musicbrainzngs", specifier = ">=0.7.1" },
     { name = "networkx", specifier = "==2.6.3" },
     { name = "numpy", specifier = "==1.21.5" },
     { name = "opencv-python", specifier = "==4.5.4.60" },
@@ -270,6 +272,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ed/2a/cb5dbfb3b87ed01f485b09a4126bf18d942373717e277c9ce671342b33cb/multidict-5.2.0-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:a5635bcf1b75f0f6ef3c8a1ad07b500104a971e38d3683167b9454cb6465ac86", size = 148177, upload-time = "2021-10-03T20:27:18.876Z" },
     { url = "https://files.pythonhosted.org/packages/0c/ac/65df4c7508739ec4820194d352cfe10e96677bb562a4b4d8dd2554e04bc9/multidict-5.2.0-cp310-cp310-win32.whl", hash = "sha256:77f0fb7200cc7dedda7a60912f2059086e29ff67cefbc58d2506638c1a9132d7", size = 43017, upload-time = "2021-10-03T20:27:19.928Z" },
     { url = "https://files.pythonhosted.org/packages/58/18/ca7e854b38db6ebe9cc1e6380947f1afd44eb275d6fb4bed8e928f34cb83/multidict-5.2.0-cp310-cp310-win_amd64.whl", hash = "sha256:9416cf11bcd73c861267e88aea71e9fcc35302b3943e45e1dbb4317f91a4b34f", size = 45416, upload-time = "2021-10-03T20:27:21.087Z" },
+]
+
+[[package]]
+name = "musicbrainzngs"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/67/3e74ae93d90ceeba72ed1a266dd3ca9abd625f315f0afd35f9b034acedd1/musicbrainzngs-0.7.1.tar.gz", hash = "sha256:ab1c0100fd0b305852e65f2ed4113c6de12e68afd55186987b8ed97e0f98e627", size = 117469, upload-time = "2020-01-11T17:38:47.581Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/fd/cef7b2580436910ccd2f8d3deec0f3c81743e15c0eb5b97dde3fbf33c0c8/musicbrainzngs-0.7.1-py2.py3-none-any.whl", hash = "sha256:e841a8f975104c0a72290b09f59326050194081a5ae62ee512f41915090e1a10", size = 25289, upload-time = "2020-01-11T17:38:45.469Z" },
 ]
 
 [[package]]

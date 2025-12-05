@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import logging
+import os
 import typing
 from io import BytesIO
 from typing import NamedTuple
@@ -16,13 +17,13 @@ from .utils.fmi_text import FmiText
 
 log = logging.getLogger(__name__)
 
-ALBUM_CACHE_DIR = "./.album_cache"
+# base cosmo directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ALBUM_CACHE_DIR = os.path.join(BASE_DIR, ".album_cache")
+
 ALBUM_CACHE_SIZE = 2 * 1024**3
 album_cache = Cache(ALBUM_CACHE_DIR, size_limit=ALBUM_CACHE_SIZE)
-
-MBID_CACHE_DIR = "./.mbid_cache"
-MBID_CACHE_SIZE = 1 * 1024**3
-mbid_cache = Cache(MBID_CACHE_DIR, size_limit=MBID_CACHE_SIZE)
 
 CAA_BASE = "https://coverartarchive.org/release"
 MUSICBRAINZ_SEARCH_URL = "https://musicbrainz.org/ws/2/release/"
@@ -263,29 +264,24 @@ class Fmi(commands.Cog):
         return None
 
     async def _get_mbid(self, artist, album):
-        key = f"{artist}:{album}"
-        cached_mbid = mbid_cache.get(key)
-        if cached_mbid:
-            log.info("MBID cache hit for %s: %s", key, cached_mbid)
-            return cached_mbid
-
         try:
             result = musicbrainzngs.search_releases(
                 artist=artist, release=album, limit=1
             )
-            log.debug("MusicBrainz search result for %s: %s", key, result)
+            log.debug(
+                "MusicBrainz search result for %s / %s: %s", artist, album, result
+            )
 
             if "release-list" in result and result["release-list"]:
                 mbid = result["release-list"][0]["id"]
-                log.info("Caching MBID for %s: %s", key, mbid)
-                mbid_cache.set(key, mbid)
+                log.info("Found MBID for %s / %s: %s", artist, album, mbid)
                 return mbid
             else:
                 log.warning(
                     "No releases found for artist: %s, album: %s", artist, album
                 )
         except musicbrainzngs.WebServiceError as e:
-            log.exception("MusicBrainz query failed for %s/%s: %s", artist, album, e)
+            log.exception("MusicBrainz query failed for %s / %s: %s", artist, album, e)
 
         return None
 

@@ -23,7 +23,6 @@ async def main():
 
 
 def setup_logging():
-    # set up logging
     max_bytes = 32 * 1024 * 1024
     log = logging.getLogger()
     log.setLevel(logging.INFO)

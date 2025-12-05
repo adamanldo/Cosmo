@@ -1,8 +1,8 @@
 .env
 .album_cache
-.mbid_cache
 .ruff_cache
 .venv
 __pycache__/
 cosmo.log
+cosmo.log.[1-5]
 cogs/misc.py

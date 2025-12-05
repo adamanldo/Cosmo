@@ -264,24 +264,25 @@ class Fmi(commands.Cog):
         return None
 
     async def _get_mbid(self, artist, album):
-        try:
-            result = musicbrainzngs.search_releases(
-                artist=artist, release=album, limit=1
-            )
-            log.debug(
-                "MusicBrainz search result for %s / %s: %s", artist, album, result
-            )
+        loop = asyncio.get_running_loop()
 
-            if "release-list" in result and result["release-list"]:
-                mbid = result["release-list"][0]["id"]
-                log.info("Found MBID for %s / %s: %s", artist, album, mbid)
-                return mbid
-            else:
-                log.warning(
-                    "No releases found for artist: %s, album: %s", artist, album
-                )
+        def mbid_request():
+            return musicbrainzngs.search_releases(artist=artist, release=album, limit=1)
+
+        try:
+            result = await loop.run_in_executor(None, mbid_request)
         except musicbrainzngs.WebServiceError as e:
             log.exception("MusicBrainz query failed for %s / %s: %s", artist, album, e)
+            return None
+
+        log.debug("MusicBrainz search result for %s / %s: %s", artist, album, result)
+
+        if "release-list" in result and result["release-list"]:
+            mbid = result["release-list"][0]["id"]
+            log.info("Found MBID for %s / %s: %s", artist, album, mbid)
+            return mbid
+        else:
+            log.warning("No releases found for artist: %s, album: %s", artist, album)
 
         return None
 

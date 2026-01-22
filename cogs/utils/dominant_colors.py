@@ -1,11 +1,11 @@
 # Thanks to Shivam Thakkar
 # https://buzzrobot.com/dominant-colors-in-an-image-using-k-means-clustering-3c7af4622036
 
-from sklearn.cluster import KMeans
+import colour
 import cv2
 import numpy as np
 from skimage.color import lab2rgb
-import colour
+from sklearn.cluster import KMeans
 
 
 def lab_to_rgb(color):
@@ -20,6 +20,14 @@ def lab_to_rgb(color):
 def dominant_colors(image, clusters=5):
     img = np.frombuffer(image, dtype=np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
+
+    # handle greyscale images by converting to BGR
+    if len(img.shape) == 2:  # greyscale image (no color channels)
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    elif (
+        len(img.shape) == 3 and img.shape[2] == 1
+    ):  # single channel with explicit dimension
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
     # convert to lab color space from bgr
     img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_BGR2LAB)

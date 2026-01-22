@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import logging
 import os
 import typing
@@ -9,9 +8,10 @@ from typing import NamedTuple
 import discord
 import musicbrainzngs
 from discord.ext import commands
-from diskcache import Cache
-from PIL import Image
 
+from .utils.album_art import get_album_image
+from .utils.album_art.cache import AlbumCache
+from .utils.album_art.fetcher import fetch_avatar_bytes
 from .utils.fmi_builder import FmiBuilder
 from .utils.fmi_text import FmiText
 
@@ -21,17 +21,11 @@ log = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALBUM_CACHE_DIR = os.path.join(BASE_DIR, ".album_cache")
-
 ALBUM_CACHE_SIZE = 2 * 1024**3
-album_cache = Cache(ALBUM_CACHE_DIR, size_limit=ALBUM_CACHE_SIZE)
-
-CAA_BASE = "https://coverartarchive.org/release"
-MUSICBRAINZ_SEARCH_URL = "https://musicbrainz.org/ws/2/release/"
+album_cache = AlbumCache(ALBUM_CACHE_DIR, size_limit=ALBUM_CACHE_SIZE)
 
 
 class LastFmParameters(NamedTuple):
-    """Represents data returned from Last.fm"""
-
     title: str
     artist: str
     album: str
@@ -71,6 +65,8 @@ class MentionedUserNotFound(commands.CommandError):
 class Fmi(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.album_cache = album_cache
+
         musicbrainzngs.set_useragent(
             "Cosmo",
             "1.0",
@@ -221,123 +217,26 @@ class Fmi(commands.Cog):
             raise LastFMInfoError
 
     async def _get_album_art(self, artist, album, lastfm_url):
-        key = hashlib.md5(f"{artist}:{album}".encode()).hexdigest()
-        cached_image = album_cache.get(key)
-        if cached_image:
-            log.info("Album art cache hit for %s / %s", artist, album)
-            return BytesIO(cached_image)
-
-        mbid = await self._get_mbid(artist, album)
-        if mbid:
-            log.info("Fetching album art from CAA for MBID %s", mbid)
-            img = await self._fetch_caa_art(mbid)
-            if img:
-                try:
-                    img.seek(0)
-                    with Image.open(img) as im:
-                        im.verify()
-                    img.seek(0)
-                    album_cache.set(key, img.getvalue())
-                    return img
-                except Exception:
-                    log.warning("Invalid album art fetched for %s / %s", artist, album)
-
-        if lastfm_url:
-            log.info("Fetching album art from Last.fm for %s / %s", artist, album)
-            img = await self._fetch_lastfm_art(lastfm_url)
-            if img:
-                try:
-                    img.seek(0)
-                    with Image.open(img) as im:
-                        im.verify()
-                    img.seek(0)
-                    album_cache.set(key, img.getvalue())
-                    return img
-                except Exception:
-                    log.warning(
-                        "Invalid album art fetched from Last.fm for %s / %s",
-                        artist,
-                        album,
-                    )
-
-        log.warning("Album art not found for %s / %s", artist, album)
-        return None
-
-    async def _get_mbid(self, artist, album):
-        loop = asyncio.get_running_loop()
-
-        def mbid_request():
-            return musicbrainzngs.search_releases(artist=artist, release=album, limit=1)
-
         try:
-            result = await loop.run_in_executor(None, mbid_request)
-        except musicbrainzngs.WebServiceError as e:
-            log.exception("MusicBrainz query failed for %s / %s: %s", artist, album, e)
+            return await get_album_image(
+                self.bot.session,
+                self.album_cache,
+                artist,
+                album,
+                lastfm_url,
+            )
+        except Exception as e:
+            log.exception("Error getting album art for %s / %s: %s", artist, album, e)
             return None
 
-        log.debug("MusicBrainz search result for %s / %s: %s", artist, album, result)
-
-        if "release-list" in result and result["release-list"]:
-            mbid = result["release-list"][0]["id"]
-            log.info("Found MBID for %s / %s: %s", artist, album, mbid)
-            return mbid
-        else:
-            log.warning("No releases found for artist: %s, album: %s", artist, album)
-
-        return None
-
-    async def _fetch_caa_art(self, mbid):
-        url = f"{CAA_BASE}/{mbid}/front-250"
+    async def _fetch_avatar(self, avatar_url):
         try:
-            async with self.bot.session.get(url) as resp:
-                if resp.status == 200:
-                    content = await resp.read()
-                    return BytesIO(content)
-                elif resp.status == 404:
-                    log.warning("No CAA art found for MBID %s", mbid)
-                else:
-                    log.warning(
-                        "CAA returned unexpected status %d for MBID %s",
-                        resp.status,
-                        mbid,
-                    )
+            avatar_bytes = await fetch_avatar_bytes(self.bot.session, avatar_url)
+            if avatar_bytes:
+                return BytesIO(avatar_bytes)
+            return None
         except Exception as e:
-            log.exception("Failed to fetch CAA art for MBID %s: %s", mbid, e)
-
-        return None
-
-    async def _fetch_lastfm_art(self, lastfm_url):
-        try:
-            async with self.bot.session.get(lastfm_url) as resp:
-                if resp.status == 200:
-                    content = await resp.read()
-                    return BytesIO(content)
-                elif resp.status == 404:
-                    log.warning("No Last.fm art found at url: %s", lastfm_url)
-                    return None
-                else:
-                    log.warning(
-                        "Last.fm returned unexpected status %d for url: %s",
-                        resp.status,
-                        lastfm_url,
-                    )
-        except Exception:
-            log.exception("Last.fm request failed for url %s", lastfm_url)
-        return None
-
-    async def _fetch_avatar(self, url):
-        try:
-            async with self.bot.session.get(url) as resp:
-                if resp.status == 200:
-                    content = await resp.read()
-                    return BytesIO(content)
-                else:
-                    log.warning(
-                        "Failed to fetch avatar: %s returned %d", url, resp.status
-                    )
-                    return None
-        except Exception:
-            log.exception("Exception in fetching avatar: %s", url)
+            log.exception("Error fetching avatar: %s", e)
             return None
 
     async def _generate_fmi(self, lastfmdata, avatar_url):
@@ -351,8 +250,8 @@ class Fmi(commands.Cog):
 
         album_result, avatar_result = await asyncio.gather(album_task, avatar_task)
 
-        album_bytes = album_result
-        if album_bytes is None:
+        album_bytes_io = album_result
+        if album_bytes_io is None:
             log.error(
                 "Album art not found for %s / %s", lastfmdata.artist, lastfmdata.album
             )
@@ -362,27 +261,10 @@ class Fmi(commands.Cog):
         if avatar_bytes is None:
             raise AvatarNotFoundError()
 
-        try:
-            album_bytes.seek(0)
-            header = album_bytes.read(6)
-            album_bytes.seek(0)
-            if header in (b"GIF87a", b"GIF89a"):
-                album_bytes = self._gif_to_png(album_bytes)
-        except Exception:
-            log.exception("Failed to convert GIF to PNG")
-            raise AlbumArtError()
-
         text = FmiText(lastfmdata)
-        image = FmiBuilder(album_bytes, avatar_bytes, text).create_fmi()
+        image = FmiBuilder(album_bytes_io, avatar_bytes, text).create_fmi()
 
         return image
-
-    def _gif_to_png(self, gif):
-        gif = Image.open(gif)
-        output = BytesIO()
-        gif.save(output, format="PNG")
-        output.seek(0)
-        return output
 
 
 async def setup(bot):

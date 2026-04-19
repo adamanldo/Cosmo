@@ -1,28 +1,19 @@
 import asyncio
 import logging
-import os
 import typing
 from io import BytesIO
 from typing import NamedTuple
 
+import aiohttp
 import discord
-import musicbrainzngs
 from discord.ext import commands
 
 from .utils.album_art import get_album_image
-from .utils.album_art.cache import AlbumCache
 from .utils.album_art.fetcher import fetch_avatar_bytes
 from .utils.fmi_builder import FmiBuilder
 from .utils.fmi_text import FmiText
 
 log = logging.getLogger(__name__)
-
-# base cosmo directory
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-ALBUM_CACHE_DIR = os.path.join(BASE_DIR, ".album_cache")
-ALBUM_CACHE_SIZE = 2 * 1024**3
-album_cache = AlbumCache(ALBUM_CACHE_DIR, size_limit=ALBUM_CACHE_SIZE)
 
 
 class LastFmParameters(NamedTuple):
@@ -65,12 +56,6 @@ class MentionedUserNotFound(commands.CommandError):
 class Fmi(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.album_cache = album_cache
-
-        musicbrainzngs.set_useragent(
-            "Cosmo",
-            "1.0",
-        )
 
     async def find_user(self, discord_id):
         query = "SELECT username FROM discord WHERE id = $1;"
@@ -104,7 +89,7 @@ class Fmi(commands.Cog):
             await ctx.send("There was an error adding the user.")
 
     @commands.command(name="fmi")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(3, 10, commands.BucketType.user)
     async def fmi(self, ctx, other_user: typing.Optional[discord.Member] = None):
         if other_user:
             lastfm_username = await self.find_user(other_user.id)
@@ -175,7 +160,9 @@ class Fmi(commands.Cog):
                 if resp.status != 200:
                     raise LastFMInfoError
                 js = await resp.json()
-        except Exception:
+        except LastFMInfoError:
+            raise
+        except (aiohttp.ClientError, asyncio.TimeoutError):
             log.exception("Failed to contact Last.fm for user %s", lastfm_username)
             raise LastFMInfoError
 
@@ -220,10 +207,11 @@ class Fmi(commands.Cog):
         try:
             return await get_album_image(
                 self.bot.session,
-                self.album_cache,
                 artist,
                 album,
                 lastfm_url,
+                self.bot.spotify_client_id,
+                self.bot.spotify_client_secret,
             )
         except Exception as e:
             log.exception("Error getting album art for %s / %s: %s", artist, album, e)

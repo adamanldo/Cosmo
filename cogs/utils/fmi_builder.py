@@ -10,11 +10,12 @@ WHITE = ipy.Paint.Color((255, 255, 255, 255))
 
 
 class FmiBuilder:
-    def __init__(self, album_bytes, avatar_bytes, text):
-        self._primary, self._secondary = dominant_colors(album_bytes.getvalue())
+    def __init__(self, album_bytes, avatar_bytes, text, color_fn=None):
+        fn = color_fn if color_fn is not None else dominant_colors
+        self._primary, self._secondary = fn(album_bytes.getvalue())
         self._avatar_image = self.mask_and_resize_discord_avatar(avatar_bytes)
         self._album_image = Image.open(album_bytes).resize(
-            (124, 124), resample=Image.ANTIALIAS
+            (124, 124), resample=Image.Resampling.LANCZOS
         )
         self._text = text
         self._text_color = self.get_text_color(self._primary)

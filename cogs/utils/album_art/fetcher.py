@@ -1,81 +1,122 @@
 import asyncio
 import logging
+import time
 
-import musicbrainzngs
+import aiohttp
 
 log = logging.getLogger(__name__)
 
-CAA_BASE = "https://coverartarchive.org/release"
-MUSICBRAINZ_SEARCH_URL = "https://musicbrainz.org/ws/2/release/"
+_spotify_token: str | None = None
+_spotify_token_expires: float = 0.0
+
+# Last.fm serves this hash as the URL when no real art exists
+_LASTFM_PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f"
+
+_LASTFM_TIMEOUT = aiohttp.ClientTimeout(sock_connect=3, total=8)
+_SPOTIFY_API_TIMEOUT = aiohttp.ClientTimeout(total=5)
+_SPOTIFY_IMG_TIMEOUT = aiohttp.ClientTimeout(total=8)
 
 
-async def fetch_album_bytes(session, artist, album, lastfm_url):
-    loop = asyncio.get_running_loop()
+async def _get_spotify_token(session, client_id, client_secret):
+    global _spotify_token, _spotify_token_expires
+    if _spotify_token and time.monotonic() < _spotify_token_expires - 60:
+        return _spotify_token
 
-    async def fetch_caa_for_mbid(mbid):
-        url = f"{CAA_BASE}/{mbid}/front-250"
-        try:
-            async with session.get(url, timeout=3) as resp:
-                if resp.status == 200:
-                    content = await resp.read()
-                    log.info("Fetched album art from CAA for MBID: %s", mbid)
-                    return content
-                else:
-                    log.debug("CAA returned status %s for MBID: %s", resp.status, mbid)
-        except asyncio.TimeoutError:
-            log.warning("Timeout fetching from CAA for MBID: %s", mbid)
-        except Exception as e:
-            log.exception("Error fetching from CAA for MBID %s: %s", mbid, e)
+    try:
+        async with session.post(
+            "https://accounts.spotify.com/api/token",
+            auth=aiohttp.BasicAuth(client_id, client_secret),
+            data={"grant_type": "client_credentials"},
+            timeout=_SPOTIFY_API_TIMEOUT,
+        ) as resp:
+            if resp.status != 200:
+                log.warning("Spotify token request failed with status %s", resp.status)
+                return None
+            js = await resp.json()
+            _spotify_token = js["access_token"]
+            _spotify_token_expires = time.monotonic() + js["expires_in"]
+            log.debug("Refreshed Spotify access token")
+            return _spotify_token
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        log.warning("Failed to get Spotify token: %s", e)
+    except Exception as e:
+        log.exception("Unexpected error getting Spotify token: %s", e)
+    return None
+
+
+async def _fetch_spotify_art(session, artist, album, client_id, client_secret):
+    if not client_id or not client_secret:
         return None
 
-    async def fetch_lastfm_art(lastfm_url):
-        if not lastfm_url:
-            return None
-        try:
-            async with session.get(lastfm_url, timeout=3) as resp:
-                if resp.status == 200:
-                    content = await resp.read()
-                    log.info("Fetched album art from Last.fm")
-                    return content
-                else:
-                    log.debug("Last.fm returned status %s", resp.status)
-        except asyncio.TimeoutError:
-            log.warning("Timeout fetching from Last.fm URL")
-        except Exception as e:
-            log.exception("Error fetching from Last.fm: %s", e)
-        return None
-
-    # Try Last.fm first
-    lastfm_bytes = await fetch_lastfm_art(lastfm_url)
-    if lastfm_bytes:
-        return lastfm_bytes
-
-    # Try MusicBrainz/CAA
-    def mbid_search():
-        try:
-            result = musicbrainzngs.search_releases(
-                artist=artist, release=album, limit=1
-            )
-            if "release-list" in result and result["release-list"]:
-                mbid = result["release-list"][0]["id"]
-                log.debug("Found MBID for %s / %s: %s", artist, album, mbid)
-                return mbid
-            else:
-                log.debug("No MusicBrainz results for %s / %s", artist, album)
-        except Exception as e:
-            log.exception("MusicBrainz search failed for %s / %s: %s", artist, album, e)
+    token = await _get_spotify_token(session, client_id, client_secret)
+    if not token:
         return None
 
     try:
-        mbid = await loop.run_in_executor(None, mbid_search)
-    except Exception as e:
-        log.exception("Error searching MusicBrainz: %s", e)
-        mbid = None
+        params = {"q": f"album:{album} artist:{artist}", "type": "album", "limit": 1}
+        headers = {"Authorization": f"Bearer {token}"}
+        async with session.get(
+            "https://api.spotify.com/v1/search",
+            headers=headers,
+            params=params,
+            timeout=_SPOTIFY_API_TIMEOUT,
+        ) as resp:
+            if resp.status != 200:
+                log.debug("Spotify search returned status %s", resp.status)
+                return None
+            js = await resp.json()
 
-    if mbid:
-        caa_bytes = await fetch_caa_for_mbid(mbid)
-        if caa_bytes:
-            return caa_bytes
+        items = js.get("albums", {}).get("items", [])
+        if not items:
+            log.debug("No Spotify results for %s / %s", artist, album)
+            return None
+
+        images = items[0].get("images", [])
+        if not images:
+            return None
+
+        image_url = images[0]["url"]  # Spotify sorts images largest-first
+        async with session.get(image_url, timeout=_SPOTIFY_IMG_TIMEOUT) as resp:
+            if resp.status == 200:
+                content = await resp.read()
+                log.info("Fetched album art from Spotify for %s / %s", artist, album)
+                return content
+            log.debug("Spotify image fetch returned status %s", resp.status)
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        log.warning("Spotify art fetch failed for %s / %s: %s", artist, album, e)
+    except Exception as e:
+        log.exception("Unexpected error fetching Spotify art for %s / %s: %s", artist, album, e)
+
+    return None
+
+
+async def fetch_album_bytes(
+    session, artist, album, lastfm_url, spotify_client_id=None, spotify_client_secret=None
+):
+    if lastfm_url and _LASTFM_PLACEHOLDER not in lastfm_url:
+        for attempt in range(2):
+            try:
+                async with session.get(lastfm_url, timeout=_LASTFM_TIMEOUT) as resp:
+                    if resp.status == 200:
+                        content = await resp.read()
+                        log.info("Fetched album art from Last.fm")
+                        return content
+                    log.debug("Last.fm returned status %s", resp.status)
+                    break
+            except asyncio.TimeoutError:
+                if attempt == 0:
+                    log.warning("Timeout fetching from Last.fm URL, retrying...")
+                else:
+                    log.warning("Last.fm URL timed out after retry")
+            except aiohttp.ClientError as e:
+                log.warning("Last.fm fetch error: %s", e)
+                break
+
+    spotify_bytes = await _fetch_spotify_art(
+        session, artist, album, spotify_client_id, spotify_client_secret
+    )
+    if spotify_bytes:
+        return spotify_bytes
 
     log.warning("No album artwork found for %s / %s", artist, album)
     return None
@@ -83,14 +124,12 @@ async def fetch_album_bytes(session, artist, album, lastfm_url):
 
 async def fetch_avatar_bytes(session, url):
     try:
-        async with session.get(url, timeout=3) as resp:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
             if resp.status == 200:
-                content = await resp.read()
-                log.debug("Successfully fetched avatar")
-                return content
-            else:
-                log.warning("Avatar fetch returned status %s", resp.status)
+                return await resp.read()
+            log.warning("Avatar fetch returned status %s", resp.status)
     except asyncio.TimeoutError:
         log.warning("Timeout fetching avatar from %s", url)
     except Exception as e:
         log.exception("Error fetching avatar: %s", e)
+    return None

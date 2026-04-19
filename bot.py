@@ -12,6 +12,8 @@ class Cosmo(commands.Bot):
     def __init__(self, cogs):
         self.api_key = config.LASTFM_API_KEY
         self.user_agent = config.USER_AGENT
+        self.spotify_client_id = config.SPOTIFY_CLIENT_ID
+        self.spotify_client_secret = config.SPOTIFY_CLIENT_SECRET
         self.initial_cogs = cogs
 
         intents = discord.Intents(

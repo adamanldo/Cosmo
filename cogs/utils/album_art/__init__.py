@@ -1,6 +1,6 @@
 import logging
 
-from .decoder import decode_image_from_bytes, validate_image_bytes
+from .decoder import decode_image_from_bytes
 from .fetcher import fetch_album_bytes
 
 log = logging.getLogger(__name__)
@@ -19,10 +19,6 @@ async def get_album_image(
 
     if not img_bytes:
         log.info("No album bytes found for %s / %s", artist, album)
-        return None
-
-    if not validate_image_bytes(img_bytes):
-        log.warning("Image validation failed for %s / %s", artist, album)
         return None
 
     try:

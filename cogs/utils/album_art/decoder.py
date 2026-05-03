@@ -6,17 +6,6 @@ from PIL import Image
 log = logging.getLogger(__name__)
 
 
-def validate_image_bytes(data):
-    try:
-        bio = BytesIO(data)
-        with Image.open(bio) as img:
-            img.verify()
-        return True
-    except Exception as e:
-        log.warning("Image validation failed: %s", e)
-        return False
-
-
 def decode_image_from_bytes(data):
     try:
         bio = BytesIO(data)

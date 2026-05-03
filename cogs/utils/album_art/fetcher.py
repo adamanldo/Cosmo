@@ -11,10 +11,28 @@ _spotify_token_expires: float = 0.0
 
 # Last.fm serves this hash as the URL when no real art exists
 _LASTFM_PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f"
+_LASTFM_PLACEHOLDER_URL = f"https://lastfm.freetls.fastly.net/i/u/300x300/{_LASTFM_PLACEHOLDER}.png"
+_placeholder_bytes: bytes | None = None
 
 _LASTFM_TIMEOUT = aiohttp.ClientTimeout(sock_connect=3, total=8)
 _SPOTIFY_API_TIMEOUT = aiohttp.ClientTimeout(total=5)
 _SPOTIFY_IMG_TIMEOUT = aiohttp.ClientTimeout(total=8)
+
+
+async def _fetch_placeholder(session):
+    global _placeholder_bytes
+    if _placeholder_bytes is not None:
+        return _placeholder_bytes
+    try:
+        async with session.get(_LASTFM_PLACEHOLDER_URL, timeout=_LASTFM_TIMEOUT) as resp:
+            if resp.status == 200:
+                _placeholder_bytes = await resp.read()
+                log.info("Fetched and cached Last.fm placeholder image")
+                return _placeholder_bytes
+            log.warning("Placeholder image fetch returned status %s", resp.status)
+    except Exception as e:
+        log.warning("Failed to fetch placeholder image: %s", e)
+    return None
 
 
 async def _get_spotify_token(session, client_id, client_secret):
@@ -118,8 +136,8 @@ async def fetch_album_bytes(
     if spotify_bytes:
         return spotify_bytes
 
-    log.warning("No album artwork found for %s / %s", artist, album)
-    return None
+    log.warning("No album artwork found for %s / %s, using placeholder", artist, album)
+    return await _fetch_placeholder(session)
 
 
 async def fetch_avatar_bytes(session, url):

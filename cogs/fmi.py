@@ -12,8 +12,17 @@ from .utils.album_art import get_album_image
 from .utils.album_art.fetcher import fetch_avatar_bytes
 from .utils.fmi_builder import FmiBuilder
 from .utils.fmi_text import FmiText
+import config
 
 log = logging.getLogger(__name__)
+
+
+def _fmi_cooldown(ctx):
+    if ctx.author.id == config.OWNER_USER_ID:
+        return None
+    if ctx.guild and ctx.guild.id == config.SERVER_GUILD_ID:
+        return None
+    return commands.Cooldown(3, 10)
 
 
 class LastFmParameters(NamedTuple):
@@ -89,7 +98,7 @@ class Fmi(commands.Cog):
             await ctx.send("There was an error adding the user.")
 
     @commands.command(name="fmi")
-    @commands.cooldown(3, 10, commands.BucketType.user)
+    @commands.dynamic_cooldown(_fmi_cooldown, commands.BucketType.user)
     async def fmi(self, ctx, other_user: typing.Optional[discord.Member] = None):
         if other_user:
             lastfm_username = await self.find_user(other_user.id)
@@ -250,7 +259,10 @@ class Fmi(commands.Cog):
             raise AvatarNotFoundError()
 
         text = FmiText(lastfmdata)
-        image = FmiBuilder(album_bytes_io, avatar_bytes, text).create_fmi()
+        loop = asyncio.get_running_loop()
+        image = await loop.run_in_executor(
+            None, lambda: FmiBuilder(album_bytes_io, avatar_bytes, text).create_fmi()
+        )
 
         return image
 

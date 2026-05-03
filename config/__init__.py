@@ -11,3 +11,5 @@ USER_AGENT = os.getenv("USER_AGENT")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+SERVER_GUILD_ID = int(x) if (x := os.getenv("SERVER_GUILD_ID")) else None
+OWNER_USER_ID = int(x) if (x := os.getenv("OWNER_USER_ID")) else None

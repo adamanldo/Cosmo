@@ -11,7 +11,7 @@ def lab_to_rgb(color):
     return [int(np.clip(c * 255, 0, 255)) for c in rgb]
 
 
-def dominant_colors(image, clusters=5):
+def dominant_colors(image, clusters=4):
     img = np.frombuffer(image, dtype=np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
 
@@ -20,23 +20,20 @@ def dominant_colors(image, clusters=5):
     elif len(img.shape) == 3 and img.shape[2] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
-    img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_BGR2LAB)
-    img = img.reshape((img.shape[0] * img.shape[1], 3))
+    h, w = img.shape[:2]
+    if h * w > 5000:
+        scale = (5000 / (h * w)) ** 0.5
+        img = cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))), interpolation=cv2.INTER_AREA)
 
-    cluster = KMeans(n_clusters=clusters, tol=0.001, random_state=42)
+    img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_BGR2LAB)
+    img = img.reshape((-1, 3))
+
+    cluster = KMeans(n_clusters=clusters, n_init=2, tol=0.001, random_state=42)
     cluster.fit(img)
 
     colors = cluster.cluster_centers_
-    labels = cluster.labels_
-
-    labels = list(labels)
-    percent = []
-    for i in range(len(colors)):
-        j = labels.count(i)
-        j = j / len(labels)
-        percent.append(j)
-
-    percent = np.array(percent)
+    counts = np.bincount(cluster.labels_, minlength=clusters)
+    percent = counts / counts.sum()
     colors = colors[(-percent).argsort()]
 
     counter = 1
@@ -48,7 +45,7 @@ def dominant_colors(image, clusters=5):
     highest_delta_e = delta_e
 
     if delta_e < 20:
-        while delta_e < 20 and counter < 4:
+        while delta_e < 20 and counter < len(colors) - 1:
             counter += 1
             secondary = colors[counter]
             delta_e = colour.difference.delta_E_CIE2000(primary, secondary)
@@ -99,7 +96,7 @@ def _hue_isolation_bonus(h, hues, chromas):
 
 def dominant_colors_v2(
     image,
-    clusters=5,
+    clusters=4,
     min_delta_e=8,
     min_percentage=0.02,
     min_chroma=12,
@@ -110,16 +107,20 @@ def dominant_colors_v2(
     if len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
+    h, w = img.shape[:2]
+    if h * w > 5000:
+        scale = (5000 / (h * w)) ** 0.5
+        img = cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))), interpolation=cv2.INTER_AREA)
+
     img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_BGR2LAB)
     img = img.reshape((-1, 3))
 
-    cluster = KMeans(n_clusters=clusters, tol=0.001, random_state=42)
+    cluster = KMeans(n_clusters=clusters, n_init=2, tol=0.001, random_state=42)
     cluster.fit(img)
 
     colors = cluster.cluster_centers_
-    labels = cluster.labels_
-
-    percent = np.array([(labels == i).sum() / len(labels) for i in range(len(colors))])
+    counts = np.bincount(cluster.labels_, minlength=clusters)
+    percent = counts / counts.sum()
     order = (-percent).argsort()
     colors = colors[order]
     percent = percent[order]

@@ -115,42 +115,6 @@ class Fmi(commands.Cog):
         image = await self._generate_fmi(last_fm_info, avatar_url)
         await ctx.send(file=discord.File(image, "fmi.png"))
 
-    @fmi.error
-    async def fmi_error(self, ctx, error):
-        if isinstance(error, MentionedUserNotFound):
-            await ctx.send(
-                "It looks like {} hasn't connected their Last.fm account.".format(
-                    error.name
-                )
-            )
-        elif isinstance(error, UserNotFound):
-            await ctx.send(
-                "It looks like you haven't connected your Last.fm account.\nTry using `.set [last.fm username]`"
-            )
-        elif isinstance(error, LastFMInfoError):
-            await ctx.send(
-                "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."
-            )
-        elif isinstance(error, ScrobbleMissingInfoError):
-            await ctx.send(
-                "Your most recent scrobble is missing an album name or album artwork."
-            )
-        elif isinstance(error, AvatarNotFoundError):
-            await ctx.send(
-                "Couldn't fetch the avatar image. Try again in a few minutes."
-            )
-        elif isinstance(error, AlbumArtError):
-            await ctx.send(
-                "We can't get that album artwork right now, try again in a few minutes."
-            )
-        elif isinstance(error, NoScrobblesFoundError):
-            await ctx.send("No scrobbles found.")
-        elif isinstance(error, commands.CommandOnCooldown):
-            await ctx.send("You're using that too much.")
-        else:
-            await ctx.send("Something went wrong...")
-            log.error("Error: ", exc_info=error)
-
     async def _get_lastfm_info(self, lastfm_username):
         params = {
             "method": "user.getrecenttracks",
@@ -265,6 +229,42 @@ class Fmi(commands.Cog):
         )
 
         return image
+
+    @fmi.error
+    async def fmi_error(self, ctx, error):
+        if isinstance(error, MentionedUserNotFound):
+            await ctx.send(
+                "It looks like {} hasn't connected their Last.fm account.".format(
+                    error.name
+                )
+            )
+        elif isinstance(error, UserNotFound):
+            await ctx.send(
+                "It looks like you haven't connected your Last.fm account.\nTry using `.set [last.fm username]`"
+            )
+        elif isinstance(error, LastFMInfoError):
+            await ctx.send(
+                "Account doesn't exist on Last.fm or we can't connect to the Last.fm API."
+            )
+        elif isinstance(error, ScrobbleMissingInfoError):
+            await ctx.send(
+                "Your most recent scrobble is missing an album name or album artwork."
+            )
+        elif isinstance(error, AvatarNotFoundError):
+            await ctx.send(
+                "Couldn't fetch the avatar image. Try again in a few minutes."
+            )
+        elif isinstance(error, AlbumArtError):
+            await ctx.send(
+                "We can't get that album artwork right now, try again in a few minutes."
+            )
+        elif isinstance(error, NoScrobblesFoundError):
+            await ctx.send("No scrobbles found.")
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.send("You're using that too much.")
+        else:
+            await ctx.send("Something went wrong...")
+            log.error("Error: ", exc_info=error)
 
 
 async def setup(bot):

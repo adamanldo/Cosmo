@@ -10,9 +10,8 @@ WHITE = ipy.Paint.Color((255, 255, 255, 255))
 
 
 class FmiBuilder:
-    def __init__(self, album_bytes, avatar_bytes, text, color_fn=None):
-        fn = color_fn if color_fn is not None else dominant_colors
-        self._primary, self._secondary = fn(album_bytes.getvalue())
+    def __init__(self, album_bytes, avatar_bytes, text):
+        self._primary, self._secondary = dominant_colors(album_bytes.getvalue())
         self._avatar_image = self.mask_and_resize_discord_avatar(avatar_bytes)
         self._album_image = Image.open(album_bytes).resize(
             (124, 124), resample=Image.Resampling.LANCZOS
@@ -26,12 +25,13 @@ class FmiBuilder:
         # Paste the album image
         self._background.paste(self._album_image, (12, 12))
 
-        # Draw the triangle, paste the user's avatar
+        # Draw the triangle with the secondary color, paste the user's avatar
         self._background_draw.polygon(
             [(548, 0), (401, 147), (548, 147)], tuple(self._secondary)
         )
         self._background.paste(self._avatar_image, (473, 73), mask=self._avatar_image)
 
+        # Draw the text
         with ipy.Writer(self._background) as w:
             w.draw_text_multiline(
                 text=self._text.title_text,

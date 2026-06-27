@@ -11,54 +11,6 @@ def lab_to_rgb(color):
     return [int(np.clip(c * 255, 0, 255)) for c in rgb]
 
 
-def dominant_colors(image, clusters=4):
-    img = np.frombuffer(image, dtype=np.uint8)
-    img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
-
-    if len(img.shape) == 2:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    elif len(img.shape) == 3 and img.shape[2] == 1:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-    h, w = img.shape[:2]
-    if h * w > 5000:
-        scale = (5000 / (h * w)) ** 0.5
-        img = cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))), interpolation=cv2.INTER_AREA)
-
-    img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_BGR2LAB)
-    img = img.reshape((-1, 3))
-
-    cluster = KMeans(n_clusters=clusters, n_init=2, tol=0.001, random_state=42)
-    cluster.fit(img)
-
-    colors = cluster.cluster_centers_
-    counts = np.bincount(cluster.labels_, minlength=clusters)
-    percent = counts / counts.sum()
-    colors = colors[(-percent).argsort()]
-
-    counter = 1
-    primary = colors[0]
-    secondary = colors[counter]
-
-    highest_delta_e_counter = 1
-    delta_e = colour.difference.delta_E_CIE2000(primary, secondary)
-    highest_delta_e = delta_e
-
-    if delta_e < 20:
-        while delta_e < 20 and counter < len(colors) - 1:
-            counter += 1
-            secondary = colors[counter]
-            delta_e = colour.difference.delta_E_CIE2000(primary, secondary)
-            if delta_e > highest_delta_e:
-                highest_delta_e = delta_e
-                highest_delta_e_counter = counter
-    secondary = colors[highest_delta_e_counter]
-
-    return lab_to_rgb(primary), lab_to_rgb(secondary)
-
-
-# --- v2: vibrant color preference ---
-
 def _chroma_boost(c, scale=40):
     return np.tanh(c / scale)
 
@@ -94,30 +46,39 @@ def _hue_isolation_bonus(h, hues, chromas):
     return 1.0 / (1.0 + density)
 
 
-def dominant_colors_v2(
+def dominant_colors(
     image,
     clusters=4,
     min_delta_e=8,
     min_percentage=0.02,
     min_chroma=12,
 ):
+    # Decode the raw image bytes into a BGR numpy array
     img = np.frombuffer(image, dtype=np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
 
+    # Ensure we always have a 3-channel BGR image (handle grayscale input)
     if len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
+    # Downsample to ~5K pixels before clustering: KMeans complexity scales with n,
+    # so this gives a ~18x speedup on a 300x300 image with negligible impact on
+    # the color distribution
     h, w = img.shape[:2]
     if h * w > 5000:
         scale = (5000 / (h * w)) ** 0.5
         img = cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))), interpolation=cv2.INTER_AREA)
 
+    # Convert to CIELAB so that Euclidean distance between colors approximates
+    # human perceptual difference, this makes the ΔE comparisons meaningful
     img = cv2.cvtColor(img.astype(np.float32) / 255, cv2.COLOR_BGR2LAB)
     img = img.reshape((-1, 3))
 
+    # Cluster pixels into `clusters` representative colors
     cluster = KMeans(n_clusters=clusters, n_init=2, tol=0.001, random_state=42)
     cluster.fit(img)
 
+    # Sort clusters by frequency (most dominant color first)
     colors = cluster.cluster_centers_
     counts = np.bincount(cluster.labels_, minlength=clusters)
     percent = counts / counts.sum()
@@ -125,26 +86,37 @@ def dominant_colors_v2(
     colors = colors[order]
     percent = percent[order]
 
+    # The most dominant cluster is always the primary color
     primary = colors[0]
 
+    # Convert each cluster center to LCH (Lightness, Chroma, Hue) so we can
+    # reason about saturation and hue angle independently
     lch = [_lab_to_lch(c) for c in colors]
     hues = np.array([h for _, _, h in lch])
     chromas = np.array([C for _, C, _ in lch])
 
+    # Score each remaining cluster as a secondary color candidate.
+    # A good secondary is perceptually distinct, vibrant, reasonably frequent,
+    # well-lit, and hue-contrasting with the primary.
     candidates = []
 
     for i in range(1, len(colors)):
+        # Skip colors that barely appear in the image; likely noise
         if percent[i] < min_percentage:
             continue
 
         delta_e = colour.difference.delta_E_CIE2000(primary, colors[i])
+        # Skip colors too perceptually similar to the primary
         if delta_e < min_delta_e:
             continue
 
         L, C, h = lch[i]
+        # Skip near-neutral colors (grays, whites, blacks), they make poor accents
         if C < min_chroma:
             continue
 
+        # Weighted score combining perceptual distance, saturation, frequency,
+        # lightness, hue opposition, and hue isolation
         delta_norm = delta_e / 50.0
         chroma_norm = _chroma_boost(C)
         freq_norm = np.sqrt(percent[i])
@@ -164,7 +136,7 @@ def dominant_colors_v2(
         candidates.append((score, i))
 
     if not candidates:
-        # Relax min_percentage but keep chroma — prevents white/gray winning on dark albums
+        # Relax min_percentage but keep chroma, prevents white/gray winning on dark albums
         for i in range(1, len(colors)):
             delta_e = colour.difference.delta_E_CIE2000(primary, colors[i])
             if delta_e < min_delta_e:

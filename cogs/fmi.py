@@ -164,7 +164,7 @@ class Fmi(commands.Cog):
                 albumartlink=albumartlink,
             )
 
-            if not all(lastfmdata):
+            if not all([title, artist, album]):
                 raise ScrobbleMissingInfoError
 
             return lastfmdata
@@ -248,7 +248,7 @@ class Fmi(commands.Cog):
             )
         elif isinstance(error, ScrobbleMissingInfoError):
             await ctx.send(
-                "Your most recent scrobble is missing an album name or album artwork."
+                "Your most recent scrobble is missing a title, artist, or album name."
             )
         elif isinstance(error, AvatarNotFoundError):
             await ctx.send(

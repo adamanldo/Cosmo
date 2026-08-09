@@ -1,3 +1,5 @@
+from itertools import combinations
+
 import colour
 import cv2
 import numpy as np
@@ -46,12 +48,39 @@ def _hue_isolation_bonus(h, hues, chromas):
     return 1.0 / (1.0 + density)
 
 
+def _merge_similar_clusters(colors, percent, threshold):
+    # On smooth-gradient covers, KMeans slices the gradient into several
+    # near-duplicate clusters with near-tied sizes, so ranking by raw cluster
+    # size makes the "primary" pick flip on essentially arbitrary partition
+    # boundaries whenever `clusters` changes. Fusing clusters that are barely
+    # distinguishable before ranking makes the pick track the true macro color
+    # regions instead.
+    colors = np.asarray(colors, dtype=float)
+    percent = np.asarray(percent, dtype=float)
+
+    while len(colors) > 1:
+        delta_e, i, j = min(
+            (colour.difference.delta_E_CIE2000(colors[a], colors[b]), a, b)
+            for a, b in combinations(range(len(colors)), 2)
+        )
+        if delta_e >= threshold:
+            break
+
+        merged_color = (colors[i] * percent[i] + colors[j] * percent[j]) / (percent[i] + percent[j])
+        merged_percent = percent[i] + percent[j]
+        colors = np.vstack([np.delete(colors, (i, j), axis=0), merged_color])
+        percent = np.append(np.delete(percent, (i, j)), merged_percent)
+
+    order = np.argsort(-percent)
+    return colors[order], percent[order]
+
+
 def dominant_colors(
     image,
-    clusters=4,
-    min_delta_e=8,
+    clusters=5,
     min_percentage=0.02,
     min_chroma=12,
+    merge_threshold=15,
 ):
     # Decode the raw image bytes into a BGR numpy array
     img = np.frombuffer(image, dtype=np.uint8)
@@ -86,6 +115,10 @@ def dominant_colors(
     colors = colors[order]
     percent = percent[order]
 
+    # Fuse clusters that are perceptually near-identical before ranking, see
+    # _merge_similar_clusters for why this matters
+    colors, percent = _merge_similar_clusters(colors, percent, merge_threshold)
+
     # The most dominant cluster is always the primary color
     primary = colors[0]
 
@@ -105,10 +138,10 @@ def dominant_colors(
         if percent[i] < min_percentage:
             continue
 
+        # _merge_similar_clusters already guarantees every surviving cluster is
+        # at least merge_threshold away from the primary in delta E, so no
+        # separate "too similar to primary" check is needed here
         delta_e = colour.difference.delta_E_CIE2000(primary, colors[i])
-        # Skip colors too perceptually similar to the primary
-        if delta_e < min_delta_e:
-            continue
 
         L, C, h = lch[i]
         # Skip near-neutral colors (grays, whites, blacks), they make poor accents
@@ -139,8 +172,6 @@ def dominant_colors(
         # Relax min_percentage but keep chroma, prevents white/gray winning on dark albums
         for i in range(1, len(colors)):
             delta_e = colour.difference.delta_E_CIE2000(primary, colors[i])
-            if delta_e < min_delta_e:
-                continue
             L, C, h = lch[i]
             if C < min_chroma:
                 continue

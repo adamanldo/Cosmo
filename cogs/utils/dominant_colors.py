@@ -13,6 +13,29 @@ def lab_to_rgb(color):
     return [int(np.clip(c * 255, 0, 255)) for c in rgb]
 
 
+def _srgb_to_linear(c):
+    c = np.clip(c, 0, 1)
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _oklab_chroma(lab_colors):
+    # Oklab (Ottosson 2020) is more perceptually uniform than CIELAB, which is
+    # documented to under-represent blue saturation relative to how vivid it
+    # actually looks to people. Used only as the vibrancy signal in scoring;
+    # clustering and distance-from-primary stay in CIELAB/CIEDE2000, which
+    # aren't shown to have a problem.
+    lab_colors = np.atleast_2d(lab_colors)
+    rgb = lab2rgb(lab_colors.reshape(-1, 1, 3)).reshape(-1, 3)
+    r, g, b = _srgb_to_linear(rgb).T
+    l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+    m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+    s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+    l_, m_, s_ = np.cbrt(l), np.cbrt(m), np.cbrt(s)
+    a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_
+    ok_b = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    return np.sqrt(a**2 + ok_b**2)
+
+
 def _chroma_boost(c, scale=40):
     return np.tanh(c / scale)
 
@@ -48,7 +71,7 @@ def _hue_isolation_bonus(h, hues, chromas):
     return 1.0 / (1.0 + density)
 
 
-def _merge_similar_clusters(colors, percent, threshold):
+def _merge_similar_clusters(colors, percent, peak_chroma, threshold):
     # On smooth-gradient covers, KMeans slices the gradient into several
     # near-duplicate clusters with near-tied sizes, so ranking by raw cluster
     # size makes the "primary" pick flip on essentially arbitrary partition
@@ -57,6 +80,7 @@ def _merge_similar_clusters(colors, percent, threshold):
     # regions instead.
     colors = np.asarray(colors, dtype=float)
     percent = np.asarray(percent, dtype=float)
+    peak_chroma = np.asarray(peak_chroma, dtype=float)
 
     while len(colors) > 1:
         delta_e, i, j = min(
@@ -68,11 +92,13 @@ def _merge_similar_clusters(colors, percent, threshold):
 
         merged_color = (colors[i] * percent[i] + colors[j] * percent[j]) / (percent[i] + percent[j])
         merged_percent = percent[i] + percent[j]
+        merged_peak_chroma = max(peak_chroma[i], peak_chroma[j])
         colors = np.vstack([np.delete(colors, (i, j), axis=0), merged_color])
         percent = np.append(np.delete(percent, (i, j)), merged_percent)
+        peak_chroma = np.append(np.delete(peak_chroma, (i, j)), merged_peak_chroma)
 
     order = np.argsort(-percent)
-    return colors[order], percent[order]
+    return colors[order], percent[order], peak_chroma[order]
 
 
 def dominant_colors(
@@ -86,16 +112,19 @@ def dominant_colors(
     img = np.frombuffer(image, dtype=np.uint8)
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
 
-    # Ensure we always have a 3-channel BGR image (handle grayscale input)
+    # Ensure we always have a 3-channel BGR image (handle grayscale and BGRA input)
     if len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    elif img.shape[2] == 4:
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-    # Downsample to ~5K pixels before clustering: KMeans complexity scales with n,
-    # so this gives a ~18x speedup on a 300x300 image with negligible impact on
-    # the color distribution
+    # Downsample to ~40K pixels before clustering. This still gives a solid
+    # speedup on large source images (e.g. Spotify's 640x640 art), but keeps
+    # enough detail that small, highly-saturated regions (logos, text) survive
+    # as their own cluster instead of blending into the background
     h, w = img.shape[:2]
-    if h * w > 5000:
-        scale = (5000 / (h * w)) ** 0.5
+    if h * w > 40000:
+        scale = (40000 / (h * w)) ** 0.5
         img = cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))), interpolation=cv2.INTER_AREA)
 
     # Convert to CIELAB so that Euclidean distance between colors approximates
@@ -111,22 +140,61 @@ def dominant_colors(
     colors = cluster.cluster_centers_
     counts = np.bincount(cluster.labels_, minlength=clusters)
     percent = counts / counts.sum()
+
+    # A cluster's centroid can be diluted by anti-aliased/blended edge pixels
+    # (e.g. thin text fading into a background) even when a genuinely vivid
+    # color exists within it, so scoring vibrancy off the single averaged
+    # center alone can unfairly punish small, saturated design elements.
+    # Track each cluster's 90th-percentile member chroma (in Oklab) instead.
+    peak_chroma = np.zeros(clusters)
+    for i in range(clusters):
+        members = img[cluster.labels_ == i]
+        if len(members):
+            peak_chroma[i] = np.percentile(_oklab_chroma(members), 90)
+
     order = (-percent).argsort()
     colors = colors[order]
     percent = percent[order]
+    peak_chroma = peak_chroma[order]
 
     # Fuse clusters that are perceptually near-identical before ranking, see
     # _merge_similar_clusters for why this matters
-    colors, percent = _merge_similar_clusters(colors, percent, merge_threshold)
-
-    # The most dominant cluster is always the primary color
-    primary = colors[0]
+    colors, percent, peak_chroma = _merge_similar_clusters(colors, percent, peak_chroma, merge_threshold)
 
     # Convert each cluster center to LCH (Lightness, Chroma, Hue) so we can
     # reason about saturation and hue angle independently
     lch = [_lab_to_lch(c) for c in colors]
+
+    # The most-frequent cluster is usually the primary color, but not always:
+    # on busy photographic covers, many visually unrelated dark/shadowed
+    # regions (shadows on different objects, foliage, clothing) often land
+    # close together in Lab space purely because they're all dark and
+    # desaturated, not because they're really "the same color" — so they can
+    # outnumber a real, uniform design color (e.g. a printed banner) by sheer
+    # pixel count. When the top-frequency cluster is low-chroma and not an
+    # overwhelming landslide over the runner-up, prefer whichever of the top
+    # few clusters best combines real size with an actual, trustworthy color.
+    primary_idx = 0
+    is_landslide = len(percent) < 2 or (percent[0] / percent[1]) >= 1.5
+    if lch[0][1] < min_chroma and not is_landslide:
+        top_k = min(3, len(colors))
+        scores = [np.sqrt(percent[i]) * lch[i][1] for i in range(top_k)]
+        primary_idx = int(np.argmax(scores))
+
+    if primary_idx != 0:
+        colors[[0, primary_idx]] = colors[[primary_idx, 0]]
+        percent[[0, primary_idx]] = percent[[primary_idx, 0]]
+        peak_chroma[[0, primary_idx]] = peak_chroma[[primary_idx, 0]]
+        lch[0], lch[primary_idx] = lch[primary_idx], lch[0]
+
+    primary = colors[0]
     hues = np.array([h for _, _, h in lch])
     chromas = np.array([C for _, C, _ in lch])
+
+    # A near-neutral primary (common: black or white backgrounds) has no
+    # meaningful hue — its hue angle is just rounding noise — so hue-opposition
+    # scoring against it would reward/penalize candidates based on that noise
+    primary_has_hue = lch[0][1] >= min_chroma
 
     # Score each remaining cluster as a secondary color candidate.
     # A good secondary is perceptually distinct, vibrant, reasonably frequent,
@@ -149,12 +217,15 @@ def dominant_colors(
             continue
 
         # Weighted score combining perceptual distance, saturation, frequency,
-        # lightness, hue opposition, and hue isolation
-        delta_norm = delta_e / 50.0
-        chroma_norm = _chroma_boost(C)
+        # lightness, hue opposition, and hue isolation. delta_norm is tanh-capped
+        # like chroma_norm so it can't dominate the score for candidates that are
+        # merely far in lightness from primary (e.g. anything vs. a near-black
+        # or near-white primary) rather than genuinely vibrant
+        delta_norm = np.tanh(delta_e / 50.0)
+        chroma_norm = _chroma_boost(peak_chroma[i], scale=0.1)
         freq_norm = np.sqrt(percent[i])
         lightness_norm = _lightness_weight(L)
-        hue_opp = _hue_opposition_boost(_hue_distance(lch[0][2], h))
+        hue_opp = _hue_opposition_boost(_hue_distance(lch[0][2], h)) if primary_has_hue else 1.0
         hue_iso = _hue_isolation_bonus(h, hues, chromas)
 
         score = (
@@ -175,7 +246,7 @@ def dominant_colors(
             L, C, h = lch[i]
             if C < min_chroma:
                 continue
-            score = 0.5 * _chroma_boost(C) + 0.5 * (delta_e / 50.0)
+            score = 0.5 * _chroma_boost(peak_chroma[i], scale=0.1) + 0.5 * np.tanh(delta_e / 50.0)
             candidates.append((score, i))
 
     if not candidates:

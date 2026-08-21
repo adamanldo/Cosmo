@@ -1,5 +1,7 @@
 # Based on gist from EvieePy https://gist.github.com/EvieePy/d78c061a4798ae81be9825468fe146be#file-owner-py
 
+import typing
+
 import discord
 from discord.ext import commands
 
@@ -59,6 +61,20 @@ class OwnerCog(commands.Cog):
             await ctx.send(f"**`ERROR:`** {type(e).__name__} - {e}")
         else:
             await ctx.send("**`SUCCESS`**")
+
+    @commands.command(name="sync", hidden=True)
+    @commands.is_owner()
+    async def sync(self, ctx, scope: typing.Optional[str] = None):
+        """Sync slash commands with Discord.
+        Use ".sync guild" to sync only to the current server (updates instantly).
+        With no argument, syncs globally (can take up to an hour to appear)."""
+
+        if scope == "guild" and ctx.guild:
+            synced = await self.bot.tree.sync(guild=ctx.guild)
+            await ctx.send(f"Synced {len(synced)} command(s) to this server.")
+        else:
+            synced = await self.bot.tree.sync()
+            await ctx.send(f"Synced {len(synced)} command(s) globally.")
 
 
 async def setup(bot):

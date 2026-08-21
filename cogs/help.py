@@ -6,9 +6,10 @@ class Help(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="help")
+    @commands.hybrid_command(name="help", description="Show available commands")
     async def help(self, ctx):
         embed = discord.Embed()
+        embed.description = "Commands also work as slash commands, e.g. `/fmi`."
         embed.add_field(name=".cd", value="Countdown for listening parties.")
         embed.add_field(
             name=".fmi",

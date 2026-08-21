@@ -10,11 +10,13 @@ A Discord bot that outputs formatted, color-coordinated images of your currently
 
 ### Usage
 
-Use `.set [last.fm username]` to associate your Last.fm username with your Discord account
+Commands work both as `.` prefix commands and as `/` slash commands.
 
-Use `.fmi` to output your currently playing Last.fm song
+Use `.set [last.fm username]` (or `/set`) to associate your Last.fm username with your Discord account
 
-Use `.cd` to start a 10 second countdown (for synchronizing listening parties)
+Use `.fmi` (or `/fmi`) to output your currently playing Last.fm song
+
+Use `.cd` (or `/cd`) to start a 10 second countdown (for synchronizing listening parties)
 
 ### Technical Notes
 

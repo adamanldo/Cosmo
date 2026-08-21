@@ -82,7 +82,12 @@ def _merge_similar_clusters(colors, percent, peak_chroma, threshold):
     percent = np.asarray(percent, dtype=float)
     peak_chroma = np.asarray(peak_chroma, dtype=float)
 
-    while len(colors) > 1:
+    # Never merge down to a single cluster: on tonally narrow covers (e.g. all
+    # dark, desaturated tones) every pairwise distance can fall under
+    # threshold, collapsing everything into one color and leaving nothing
+    # distinct for secondary to be picked from -- it would end up identical
+    # to primary. Always leave at least two clusters so that can't happen.
+    while len(colors) > 2:
         delta_e, i, j = min(
             (colour.difference.delta_E_CIE2000(colors[a], colors[b]), a, b)
             for a, b in combinations(range(len(colors)), 2)

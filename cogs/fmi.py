@@ -74,7 +74,7 @@ class Fmi(commands.Cog):
                 return row.get("username")
             return None
 
-    @commands.command(name="set")
+    @commands.hybrid_command(name="set", description="Link your Last.fm account")
     async def register(self, ctx, lastfm_username: str):
         query = """INSERT INTO discord (id, username)
                     VALUES ($1, $2)
@@ -97,9 +97,13 @@ class Fmi(commands.Cog):
             )
             await ctx.send("There was an error adding the user.")
 
-    @commands.command(name="fmi")
+    @commands.hybrid_command(
+        name="fmi",
+        description="Show your currently playing (or last played) Last.fm track",
+    )
     @commands.dynamic_cooldown(_fmi_cooldown, commands.BucketType.user)
     async def fmi(self, ctx, other_user: typing.Optional[discord.Member] = None):
+        await ctx.defer()
         if other_user:
             lastfm_username = await self.find_user(other_user.id)
             if lastfm_username is None:

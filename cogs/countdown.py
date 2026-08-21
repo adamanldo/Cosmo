@@ -6,7 +6,7 @@ class Countdown(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="cd")
+    @commands.hybrid_command(name="cd", description="10 second countdown for listening parties")
     @commands.cooldown(1, 10, commands.BucketType.guild)
     async def count(self, ctx):
         msg = await ctx.send("10")
@@ -19,7 +19,7 @@ class Countdown(commands.Cog):
                 return
         await msg.edit(content="Go!")
 
-    @commands.command(name="scd")
+    @commands.hybrid_command(name="scd", description="5 second countdown for listening parties")
     @commands.cooldown(1, 5, commands.BucketType.guild)
     async def short_count(self, ctx):
         msg = await ctx.send("5")

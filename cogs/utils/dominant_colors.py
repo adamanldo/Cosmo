@@ -27,10 +27,10 @@ def _oklab_chroma(lab_colors):
     lab_colors = np.atleast_2d(lab_colors)
     rgb = lab2rgb(lab_colors.reshape(-1, 1, 3)).reshape(-1, 3)
     r, g, b = _srgb_to_linear(rgb).T
-    l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+    lms_l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
     m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
     s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
-    l_, m_, s_ = np.cbrt(l), np.cbrt(m), np.cbrt(s)
+    l_, m_, s_ = np.cbrt(lms_l), np.cbrt(m), np.cbrt(s)
     a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_
     ok_b = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
     return np.sqrt(a**2 + ok_b**2)
@@ -106,6 +106,29 @@ def _merge_similar_clusters(colors, percent, peak_chroma, threshold):
     return colors[order], percent[order], peak_chroma[order]
 
 
+def _select_primary_index(percent, lch, min_chroma, landslide_ratio=1.5):
+    # The most-frequent cluster is usually the primary color, but not always:
+    # on busy photographic covers, many visually unrelated dark/shadowed
+    # regions (shadows on different objects, foliage, clothing) often land
+    # close together in Lab space purely because they're all dark and
+    # desaturated, not because they're really "the same color" — so they can
+    # outnumber a real, uniform design color (e.g. a printed banner) by sheer
+    # pixel count. When the top-frequency cluster is low-chroma and not an
+    # overwhelming landslide over the runner-up, prefer whichever cluster best
+    # combines real size with an actual, trustworthy color. All clusters are
+    # eligible here, not just the most frequent few: which cluster a busy dark
+    # background happens to fragment into is incidental (a slightly different
+    # scan/compression of the same photo can shift it), and can otherwise
+    # shove the real accent color just outside an arbitrary top-N window —
+    # the landslide check below already protects a genuinely dominant
+    # background from being outvoted by a small, high-chroma cluster.
+    is_landslide = len(percent) < 2 or (percent[0] / percent[1]) >= landslide_ratio
+    if lch[0][1] < min_chroma and not is_landslide:
+        scores = [np.sqrt(percent[i]) * lch[i][1] for i in range(len(percent))]
+        return int(np.argmax(scores))
+    return 0
+
+
 def dominant_colors(
     image,
     clusters=5,
@@ -170,21 +193,7 @@ def dominant_colors(
     # reason about saturation and hue angle independently
     lch = [_lab_to_lch(c) for c in colors]
 
-    # The most-frequent cluster is usually the primary color, but not always:
-    # on busy photographic covers, many visually unrelated dark/shadowed
-    # regions (shadows on different objects, foliage, clothing) often land
-    # close together in Lab space purely because they're all dark and
-    # desaturated, not because they're really "the same color" — so they can
-    # outnumber a real, uniform design color (e.g. a printed banner) by sheer
-    # pixel count. When the top-frequency cluster is low-chroma and not an
-    # overwhelming landslide over the runner-up, prefer whichever of the top
-    # few clusters best combines real size with an actual, trustworthy color.
-    primary_idx = 0
-    is_landslide = len(percent) < 2 or (percent[0] / percent[1]) >= 1.5
-    if lch[0][1] < min_chroma and not is_landslide:
-        top_k = min(3, len(colors))
-        scores = [np.sqrt(percent[i]) * lch[i][1] for i in range(top_k)]
-        primary_idx = int(np.argmax(scores))
+    primary_idx = _select_primary_index(percent, lch, min_chroma)
 
     if primary_idx != 0:
         colors[[0, primary_idx]] = colors[[primary_idx, 0]]

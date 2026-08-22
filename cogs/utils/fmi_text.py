@@ -41,42 +41,27 @@ class FmiText:
 
     def get_wrapped_text(self, text, text_type):
         if text_type == "title":
-            wrapped = ipy.text_wrap(
-                text,
-                350,
-                self.font_size,
-                self.bold_fonts,
-            )
+            return self._wrap_lines(text, width=350, font=self.bold_fonts)
+        elif text_type == "album":
+            return self._wrap_lines(text, width=280, font=self.regular_fonts)
+        elif text_type == "artist":
+            return self._wrap_single_line(text, width=312, font=self.regular_fonts)
+        raise ValueError(f"Unknown text_type: {text_type!r}")
 
-            if len(wrapped) > 2:
-                wrapped = wrapped[:2]
-                wrapped[1] = wrapped[1][:-3] + "..."
+    def _wrap_lines(self, text, width, font, max_lines=2):
+        """Word-wrap into at most `max_lines` lines, ellipsizing the last one if truncated."""
+        lines = ipy.text_wrap(text, width, self.font_size, font)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+            lines[-1] = lines[-1][:-3] + "..."
+        return lines
 
-        if text_type == "artist":
-            wrapped = ipy.text_wrap(
-                text,
-                312,
-                self.font_size,
-                self.regular_fonts,
-                wrap_style=ipy.WrapStyle.Character,
-            )
-
-            if len(wrapped) > 1:
-                wrapped = wrapped[0]
-                wrapped = wrapped[:-3] + "..."
-            else:
-                wrapped = wrapped[0]
-
-        if text_type == "album":
-            wrapped = ipy.text_wrap(
-                text,
-                280,
-                self.font_size,
-                self.regular_fonts,
-            )
-
-            if len(wrapped) > 2:
-                wrapped = wrapped[:2]
-                wrapped[1] = wrapped[1][:-3] + "..."
-
-        return wrapped
+    def _wrap_single_line(self, text, width, font):
+        """Character-wrap and keep only the first line, ellipsizing it if more would follow."""
+        lines = ipy.text_wrap(
+            text, width, self.font_size, font, wrap_style=ipy.WrapStyle.Character
+        )
+        first_line = lines[0]
+        if len(lines) > 1:
+            first_line = first_line[:-3] + "..."
+        return first_line

@@ -1,6 +1,7 @@
 .env
 .album_cache
 .ruff_cache
+.pytest_cache
 .venv
 __pycache__/
 cosmo.log

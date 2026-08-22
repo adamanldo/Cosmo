@@ -41,5 +41,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pytest>=8.0.0",
     "ruff>=0.9.3",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

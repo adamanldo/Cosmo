@@ -47,6 +47,14 @@ CREATE TABLE discord ( id bigint PRIMARY KEY UNIQUE, username TEXT NOT NULL );
 7. Start the PostgreSQL server. On Linux, the command is: `sudo service postgresql start`
 8. Run the bot with `uv run launcher.py`
 
+### Running tests
+
+After `uv sync` (this installs `pytest` along with everything else), run:
+
+```
+uv run pytest
+```
+
 ### Known issues
 
 - There are problems with some strange Unicode characters used in a few song names. They are displayed correctly on the image but the function to wrap the text doesn't seem to correctly size them, leading to the text overflowing onto the avatar.

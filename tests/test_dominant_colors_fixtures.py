@@ -53,6 +53,10 @@ def assert_in_hue_family(rgb, hue_range, min_chroma=10):
         # not get pulled toward the secondary accent (regression: Astral Weeks)
         ("van_morrison_astral_weeks.png", "near_neutral", (90, 150)),  # green
         ("carly_rae_jepsen_emotion.png", "near_neutral", (10, 60)),  # orange
+        # stark black-and-white cover with a ~2% red logo: primary must stay
+        # neutral rather than letting the tiny red detail take over and leave
+        # its own darker edge pixels as secondary (regression: Whole Lotta Red)
+        ("playboi_carti_whole_lotta_red.png", "near_neutral", (20, 60)),  # red
         # busy photographic cover: primary must be the real green banner, not
         # an incoherent blend of unrelated dark/shadowed regions (regression:
         # Pet Sounds)

@@ -106,7 +106,7 @@ def _merge_similar_clusters(colors, percent, peak_chroma, threshold):
     return colors[order], percent[order], peak_chroma[order]
 
 
-def _select_primary_index(percent, lch, min_chroma, landslide_ratio=1.5):
+def _select_primary_index(percent, lch, min_chroma, landslide_ratio=1.5, min_override_share=0.04):
     # The most-frequent cluster is usually the primary color, but not always:
     # on busy photographic covers, many visually unrelated dark/shadowed
     # regions (shadows on different objects, foliage, clothing) often land
@@ -122,9 +122,19 @@ def _select_primary_index(percent, lch, min_chroma, landslide_ratio=1.5):
     # shove the real accent color just outside an arbitrary top-N window —
     # the landslide check below already protects a genuinely dominant
     # background from being outvoted by a small, high-chroma cluster.
+    #
+    # A challenger must still cover a meaningful share of the cover, though.
+    # On stark black-and-white designs the top two clusters are both neutral
+    # and close in size, so there's never a landslide, and without a floor a
+    # tiny vivid detail (a ~2% red logo on Whole Lotta Red) would score its
+    # way into primary on chroma alone, leaving the accent's own anti-aliased
+    # edge pixels as the secondary.
     is_landslide = len(percent) < 2 or (percent[0] / percent[1]) >= landslide_ratio
     if lch[0][1] < min_chroma and not is_landslide:
-        scores = [np.sqrt(percent[i]) * lch[i][1] for i in range(len(percent))]
+        scores = [
+            np.sqrt(percent[i]) * lch[i][1] if i == 0 or percent[i] >= min_override_share else -1
+            for i in range(len(percent))
+        ]
         return int(np.argmax(scores))
     return 0
 

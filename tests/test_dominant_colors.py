@@ -205,6 +205,14 @@ def test_select_primary_index_below_landslide_ratio_triggers_override():
     assert _select_primary_index(percent, lch, min_chroma=12, landslide_ratio=1.5) == 1
 
 
+def test_select_primary_index_ignores_tiny_accent_on_neutral_cover():
+    # Black-and-white cover with no landslide between the two neutrals: a
+    # vivid but tiny (~2%) detail must not take primary (Whole Lotta Red case)
+    percent = np.array([0.525, 0.439, 0.022, 0.008, 0.005])
+    lch = [(99.0, 0.6, 151.0), (0.2, 0.1, 12.0), (44.0, 88.6, 39.0), (56.6, 6.2, 21.0), (31.9, 48.5, 31.0)]
+    assert _select_primary_index(percent, lch, min_chroma=12) == 0
+
+
 def test_select_primary_index_single_cluster_is_safe():
     percent = np.array([1.0])
     lch = [(10.0, 1.0, 0.0)]

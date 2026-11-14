@@ -108,12 +108,12 @@ class Fmi(commands.Cog):
             lastfm_username = await self.find_user(other_user.id)
             if lastfm_username is None:
                 raise MentionedUserNotFound(other_user.display_name)
-            avatar_url = str(other_user.avatar.replace(format="png", size=128))
+            avatar_url = str(other_user.display_avatar.replace(format="png", size=128))
         else:
             lastfm_username = await self.find_user(ctx.message.author.id)
             if lastfm_username is None:
                 raise UserNotFound
-            avatar_url = str(ctx.author.avatar.replace(format="png", size=128))
+            avatar_url = str(ctx.author.display_avatar.replace(format="png", size=128))
 
         last_fm_info = await self._get_lastfm_info(lastfm_username)
         image = await self._generate_fmi(last_fm_info, avatar_url)
